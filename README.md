@@ -41,6 +41,7 @@ Flyway 保证多环境数据库结构一致；JWT 无状态鉴权便于前后端
 │       │   │       ├── publisher/   # 出版社
 │       │   │       ├── category/    # 分类
 │       │   │       ├── book/        # 图书与图书-作者关联
+│       │   │       ├── borrow/      # 借书、还书、续借、逾期与罚款
 │       │   │       └── config/      # 只读系统配置（借阅规则）
 │       │   └── resources/
 │       │       ├── application.yml
@@ -148,7 +149,7 @@ curl -s -X POST http://localhost:8080/api/v1/auth/refresh \
 错误码约定：`0` 成功；`401xx` 未认证/令牌失效；`403xx` 无权限；`404xx` 不存在；`409xx` 冲突/重复；
 `422xx` 业务规则或参数校验失败（如库存不足 `42201`、超出借阅上限 `42202`）；`50000` 服务器内部错误。
 
-## 业务接口一览（阶段 2–3）
+## 业务接口一览（阶段 2–4）
 
 统一前缀 `/api/v1`，除登录/刷新外均需 `Authorization: Bearer <accessToken>`。
 
@@ -168,6 +169,11 @@ curl -s -X POST http://localhost:8080/api/v1/auth/refresh \
 | 读者 | `GET /readers`、`GET /readers/{id}`、`POST /readers`、`PUT /readers/{id}`、`PATCH /readers/{id}/status`、`DELETE /readers/{id}` | ADMIN/LIBRARIAN | 借阅证号唯一；可绑定登录账号；删除前检查借阅记录 |
 | 读者 | `GET /readers/me` | 登录 | 读者本人档案（含当前在借数量） |
 | 配置 | `GET /configs/borrow-rules` | 登录 | 借期/续借/罚款规则（前端据此展示） |
+| 借阅 | `POST /borrows` | ADMIN/LIBRARIAN | 借书（校验读者状态、库存、借阅上限、重复在借） |
+| 借阅 | `POST /borrows/{id}/return` | ADMIN/LIBRARIAN | 还书并结算逾期罚款 |
+| 借阅 | `POST /borrows/{id}/renew` | ADMIN/LIBRARIAN | 续借（逾期不可续、最多 2 次、每次 +15 天） |
+| 借阅 | `GET /borrows`、`GET /borrows/{id}` | ADMIN/LIBRARIAN | 分页查询：`keyword`、`status`、`readerId`、`bookId`、`overdueOnly`、`sort` |
+| 借阅 | `GET /borrows/my` | 登录 | 读者本人借阅记录 |
 
 示例：新增图书（ISBN 允许带连字符，服务端会规范化并校验 10/13 位）：
 
@@ -184,11 +190,29 @@ curl -s "http://localhost:8080/api/v1/books?keyword=%E4%B8%89%E4%BD%93&page=1&si
   -H "Authorization: Bearer <accessToken>"
 ```
 
+借书 → 还书（还书时按逾期天数结算罚款，罚款 = 逾期天数 × 0.50 元）：
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/borrows \
+  -H "Authorization: Bearer <accessToken>" -H 'Content-Type: application/json' \
+  -d '{"readerId":1,"bookId":1,"remark":"柜台办理"}'
+
+curl -s -X POST http://localhost:8080/api/v1/borrows/1/return \
+  -H "Authorization: Bearer <accessToken>"
+```
+
+续借与逾期记录查询：
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/borrows/1/renew -H "Authorization: Bearer <accessToken>"
+curl -s "http://localhost:8080/api/v1/borrows?overdueOnly=true&size=20" -H "Authorization: Bearer <accessToken>"
+```
+
 ## 测试
 
 ```bash
 cd backend
-mvn test          # 单元测试（42 例：JWT、登录/刷新、用户管理、图书、读者、作者规则）
+mvn test          # 单元测试（56 例：JWT、登录/刷新、用户、图书、读者、作者、借还续与罚款）
 ```
 
 集成测试基于 Testcontainers 启动真实 MySQL，需要 Docker：
@@ -201,7 +225,7 @@ mvn -Pit verify   # 集成测试：登录、/auth/me、匿名 401、读者越权
 
 - [x] 阶段 2：工程骨架、Flyway 建表与种子数据、JWT 登录/刷新/登出、RBAC、用户与角色管理、统一异常与响应
 - [x] 阶段 3：作者/出版社/分类/图书/读者 CRUD、分页搜索与排序、库存一致性校验、引用检查删除、图书主数据种子（V3）
-- [ ] 阶段 4：借书/还书/续借、逾期与罚款、事务与并发控制、核心规则单测
+- [x] 阶段 4：借书/还书/续借、逾期与罚款计算、条件更新扣减库存、唯一约束防重复在借、核心规则单测（14 例）
 - [ ] 阶段 5：前端页面、权限路由、图书/读者/借阅界面
 - [ ] 阶段 6：统计报表、种子数据扩充
 - [ ] 阶段 7：Docker Compose、完整 README、验收清单

@@ -20,6 +20,13 @@ public record PageResult<T>(List<T> records, long total, long page, long size, l
         return new PageResult<>(records, page.getTotal(), page.getCurrent(), page.getSize(), page.getPages());
     }
 
+    /**
+     * 记录已在外层装配/转换完毕时使用（例如批量装载关联表后再补全 VO）。
+     */
+    public static <T> PageResult<T> of(IPage<?> page, List<T> records) {
+        return new PageResult<>(records, page.getTotal(), page.getCurrent(), page.getSize(), page.getPages());
+    }
+
     public static <T> PageResult<T> empty(long page, long size) {
         return new PageResult<>(List.of(), 0, page, size, 0);
     }
