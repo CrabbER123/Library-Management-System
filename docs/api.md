@@ -60,7 +60,8 @@ Swagger 是接口契约的"唯一事实来源"，本文件只做导航与示例�
 | 作者/出版社/分类 | 新增/编辑/删除 | | | ✅ | ✅ |
 | 读者 | `GET /readers/me` | | ✅ | ✅ | ✅ |
 | 读者 | 列表/详情/增删改/状态 | | | ✅ | ✅ |
-| 借阅 | `POST /borrows`、`/borrows/{id}/return`、`/borrows/{id}/renew`、`GET /borrows` | | | ✅ | ✅ |
+| 借阅 | `POST /borrows`、`/borrows/{id}/return`、`/borrows/{id}/renew` | | ✅ | ✅ | ✅ |
+| 借阅 | `GET /borrows`、`GET /borrows/{id}` | | | ✅ | ✅ |
 | 借阅 | `GET /borrows/my` | | ✅ | ✅ | ✅ |
 | 统计 | `GET /stats/overview`、`/stats/popular-books`、`/stats/category-distribution` | | | ✅ | ✅ |
 | 用户/角色 | `/users/**`、`GET /roles` | | | | ✅ |
@@ -104,10 +105,17 @@ curl -s "http://localhost:8080/api/v1/books?keyword=java&categoryId=1&status=AVA
 借书 / 还书 / 续借：
 
 ```bash
+# 馆员在柜台代读者借书：必须传 readerId
 curl -s -X POST http://localhost:8080/api/v1/borrows \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"readerId":2,"bookId":5,"remark":"柜台办理"}'
 
+# 读者自助借书：不传 readerId，后端强制使用当前账号绑定的读者档案
+curl -s -X POST http://localhost:8080/api/v1/borrows \
+  -H "Authorization: Bearer $READER_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"bookId":5}'
+
+# 还书 / 续借：馆员可操作任意记录，读者只能操作自己的记录（他人记录返回 403/40300）
 curl -s -X POST http://localhost:8080/api/v1/borrows/12/return -H "Authorization: Bearer $TOKEN"
 curl -s -X POST http://localhost:8080/api/v1/borrows/12/renew  -H "Authorization: Bearer $TOKEN"
 ```

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Card, Descriptions, Select, Space, Table, Tag, Typography, message } from 'antd';
+import { Alert, Button, Card, Descriptions, Popconfirm, Select, Space, Table, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { borrowApi, configApi, readerApi } from '../../api';
 import { errorMessage } from '../../api/http';
@@ -15,6 +15,7 @@ export default function MyBorrowsPage() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string | undefined>(undefined);
   const [pagination, setPagination] = useState({ page: 1, size: 10 });
+  const [actionId, setActionId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -39,6 +40,42 @@ export default function MyBorrowsPage() {
       .catch((err) => setProfileError(errorMessage(err)));
     configApi.borrowRules().then(setRules).catch(() => setRules(null));
   }, []);
+
+  const refresh = useCallback(() => {
+    load();
+    readerApi.me().then(setProfile).catch(() => undefined);
+  }, [load]);
+
+  const returnBook = async (record: BorrowRecordVO) => {
+    setActionId(record.id);
+    try {
+      const result = await borrowApi.returnBook(record.id);
+      const fine = Number(result.fineAmount ?? 0);
+      message.success(
+        fine > 0
+          ? `归还成功，逾期 ${result.overdueDays} 天，应缴罚款 ${fine.toFixed(2)} 元`
+          : '归还成功，未产生罚款',
+      );
+      refresh();
+    } catch (err) {
+      message.error(errorMessage(err));
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const renew = async (record: BorrowRecordVO) => {
+    setActionId(record.id);
+    try {
+      const result = await borrowApi.renew(record.id);
+      message.success(`续借成功，新的应还日期 ${result.dueDate}（已续借 ${result.renewTimes} 次）`);
+      refresh();
+    } catch (err) {
+      message.error(errorMessage(err));
+    } finally {
+      setActionId(null);
+    }
+  };
 
   const columns: ColumnsType<BorrowRecordVO> = [
     {
@@ -73,6 +110,56 @@ export default function MyBorrowsPage() {
       width: 100,
       render: (value: BorrowRecordVO['status']) =>
         value === 'BORROWED' ? <Tag color="blue">借阅中</Tag> : <Tag color="green">已归还</Tag>,
+    },
+    {
+      title: '操作',
+      key: 'actions',
+      width: 170,
+      fixed: 'right',
+      render: (_, record) => {
+        if (record.status !== 'BORROWED') {
+          return (
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              已归还
+            </Typography.Text>
+          );
+        }
+        const suspended = profile?.status === 'SUSPENDED';
+        const renewTimes = record.renewTimes ?? 0;
+        const renewLimitReached = rules ? renewTimes >= rules.maxRenewTimes : false;
+        return (
+          <Space size={4} wrap>
+            <Popconfirm
+              title="确认归还？"
+              description={
+                record.overdueDays > 0
+                  ? `已逾期 ${record.overdueDays} 天，将结算罚款 ${Number(record.currentFine ?? 0).toFixed(2)} 元`
+                  : '归还后库存将立即回补'
+              }
+              okText="归还"
+              cancelText="取消"
+              disabled={suspended}
+              onConfirm={() => returnBook(record)}
+            >
+              <Button size="small" type="primary" ghost disabled={suspended} loading={actionId === record.id}>
+                还书
+              </Button>
+            </Popconfirm>
+            <Popconfirm
+              title="确认续借？"
+              description={rules ? `续借后应还日期延长 ${rules.renewDays} 天，最多 ${rules.maxRenewTimes} 次` : undefined}
+              okText="续借"
+              cancelText="取消"
+              disabled={suspended || renewLimitReached}
+              onConfirm={() => renew(record)}
+            >
+              <Button size="small" disabled={suspended || renewLimitReached} loading={actionId === record.id}>
+                续借
+              </Button>
+            </Popconfirm>
+          </Space>
+        );
+      },
     },
     {
       title: '罚款（元）',

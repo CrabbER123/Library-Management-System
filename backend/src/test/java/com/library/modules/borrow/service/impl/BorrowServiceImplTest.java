@@ -41,6 +41,8 @@ class BorrowServiceImplTest {
     private static final Long READER_ID = 1L;
     private static final Long BOOK_ID = 10L;
     private static final Long OPERATOR_ID = 2L;
+    private static final Long READER_USER_ID = 7L;
+    private static final Long OTHER_READER_ID = 99L;
 
     @Mock
     private BorrowRecordMapper borrowRecordMapper;
@@ -159,6 +161,101 @@ class BorrowServiceImplTest {
         assertThatThrownBy(() -> borrowService.borrow(new BorrowRequest(READER_ID, BOOK_ID, null)))
                 .isInstanceOfSatisfying(BizException.class,
                         ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.BOOK_NOT_AVAILABLE));
+    }
+
+    @Test
+    void readerSelfBorrowUsesOwnProfile() {
+        authenticateAsReader();
+        Reader own = reader("ACTIVE", 5);
+        own.setUserId(READER_USER_ID);
+        when(readerMapper.selectOne(any())).thenReturn(own);
+        when(readerMapper.selectById(READER_ID)).thenReturn(own);
+        when(bookMapper.selectById(BOOK_ID)).thenReturn(book("AVAILABLE", 3));
+        when(bookMapper.decreaseAvailableStock(BOOK_ID)).thenReturn(1);
+        when(readerMapper.selectBatchIds(any())).thenReturn(List.of(own));
+        when(bookMapper.selectBatchIds(any())).thenReturn(List.of(book("AVAILABLE", 2)));
+
+        BorrowRecordVO vo = borrowService.borrow(new BorrowRequest(null, BOOK_ID, null));
+
+        assertThat(vo.readerId()).isEqualTo(READER_ID);
+        ArgumentCaptor<BorrowRecord> captor = ArgumentCaptor.forClass(BorrowRecord.class);
+        verify(borrowRecordMapper).insert(captor.capture());
+        assertThat(captor.getValue().getReaderId()).isEqualTo(READER_ID);
+    }
+
+    @Test
+    void readerCannotBorrowForAnotherReader() {
+        authenticateAsReader();
+        Reader own = reader("ACTIVE", 5);
+        own.setUserId(READER_USER_ID);
+        when(readerMapper.selectOne(any())).thenReturn(own);
+
+        assertThatThrownBy(() -> borrowService.borrow(new BorrowRequest(OTHER_READER_ID, BOOK_ID, null)))
+                .isInstanceOfSatisfying(BizException.class, ex -> {
+                    assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN);
+                    assertThat(ex.getMessage()).contains("只能为自己");
+                });
+        verifyNoInteractions(bookMapper);
+        verifyNoInteractions(borrowRecordMapper);
+    }
+
+    @Test
+    void staffBorrowRequiresExplicitReaderId() {
+        assertThatThrownBy(() -> borrowService.borrow(new BorrowRequest(null, BOOK_ID, null)))
+                .isInstanceOfSatisfying(BizException.class, ex -> {
+                    assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.BAD_REQUEST);
+                    assertThat(ex.getMessage()).contains("必须指定读者");
+                });
+        verifyNoInteractions(borrowRecordMapper);
+    }
+
+    @Test
+    void readerWithoutProfileCannotBorrow() {
+        authenticateAsReader();
+        when(readerMapper.selectOne(any())).thenReturn(null);
+
+        assertThatThrownBy(() -> borrowService.borrow(new BorrowRequest(null, BOOK_ID, null)))
+                .isInstanceOfSatisfying(BizException.class, ex -> {
+                    assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.NOT_FOUND);
+                    assertThat(ex.getMessage()).contains("未绑定读者档案");
+                });
+        verifyNoInteractions(borrowRecordMapper);
+    }
+
+    @Test
+    void readerCannotReturnOrRenewAnotherReadersRecord() {
+        authenticateAsReader();
+        Reader own = reader("ACTIVE", 5);
+        own.setUserId(READER_USER_ID);
+        when(readerMapper.selectOne(any())).thenReturn(own);
+        BorrowRecord other = borrowed(LocalDate.now().plusDays(5), 0);
+        other.setReaderId(OTHER_READER_ID);
+        when(borrowRecordMapper.selectById(1L)).thenReturn(other);
+
+        assertThatThrownBy(() -> borrowService.returnBook(1L))
+                .isInstanceOfSatisfying(BizException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN));
+        assertThatThrownBy(() -> borrowService.renew(1L))
+                .isInstanceOfSatisfying(BizException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN));
+        verify(borrowRecordMapper, never()).updateById(any(BorrowRecord.class));
+    }
+
+    @Test
+    void readerCanReturnOwnRecord() {
+        authenticateAsReader();
+        Reader own = reader("ACTIVE", 5);
+        own.setUserId(READER_USER_ID);
+        when(readerMapper.selectOne(any())).thenReturn(own);
+        when(borrowRecordMapper.selectById(1L)).thenReturn(borrowed(LocalDate.now().plusDays(2), 0));
+        when(readerMapper.selectById(READER_ID)).thenReturn(own);
+        when(readerMapper.selectBatchIds(any())).thenReturn(List.of(own));
+        when(bookMapper.selectBatchIds(any())).thenReturn(List.of(book("AVAILABLE", 3)));
+
+        BorrowRecordVO vo = borrowService.returnBook(1L);
+
+        assertThat(vo.status()).isEqualTo("RETURNED");
+        verify(bookMapper).increaseAvailableStock(BOOK_ID);
     }
 
     @Test
@@ -290,6 +387,11 @@ class BorrowServiceImplTest {
     }
 
     // ---------------------------------------------------------------- 测试夹具
+
+    private void authenticateAsReader() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                new AuthUser(READER_USER_ID, "reader01", List.of("READER")), null, List.of()));
+    }
 
     private Reader reader(String status, int maxBorrow) {
         Reader reader = new Reader();

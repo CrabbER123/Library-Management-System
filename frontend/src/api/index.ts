@@ -141,8 +141,9 @@ export const borrowApi = {
   my: (params: { page?: number; size?: number; status?: string }) =>
     http.get('/borrows/my', { params }) as unknown as Promise<PageResult<BorrowRecordVO>>,
   get: (id: number) => http.get(`/borrows/${id}`) as unknown as Promise<BorrowRecordVO>,
-  borrow: (readerId: number, bookId: number, remark?: string) =>
-    http.post('/borrows', { readerId, bookId, remark }) as unknown as Promise<BorrowRecordVO>,
+  // 馆员借书需传 readerId；读者自助借书不传，服务端按当前登录账号绑定档案
+  borrow: (payload: { readerId?: number | null; bookId: number; remark?: string }) =>
+    http.post('/borrows', payload) as unknown as Promise<BorrowRecordVO>,
   returnBook: (id: number) => http.post(`/borrows/${id}/return`) as unknown as Promise<BorrowRecordVO>,
   renew: (id: number) => http.post(`/borrows/${id}/renew`) as unknown as Promise<BorrowRecordVO>,
 };

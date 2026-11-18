@@ -103,7 +103,11 @@ export default function BorrowsPage() {
     const values = await form.validateFields();
     setSaving(true);
     try {
-      const record = await borrowApi.borrow(values.readerId, values.bookId, values.remark?.trim() || undefined);
+      const record = await borrowApi.borrow({
+        readerId: values.readerId,
+        bookId: values.bookId,
+        remark: values.remark?.trim() || undefined,
+      });
       message.success(`借书成功，应还日期 ${record.dueDate}`);
       setOpen(false);
       load();

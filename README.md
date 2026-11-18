@@ -3,7 +3,7 @@
 一个可直接运行、分层清晰、带测试与文档的图书管理系统，覆盖**账号与 RBAC 权限、图书与主数据、读者、借还续、逾期罚款、统计报表**，并提供 React 管理端与 Docker Compose 一键部署。
 
 - 当前进度：**阶段 0–7 全部完成**（MVP 交付）
-- 后端 76 个单元测试、前端 21 个组件测试全部通过
+- 后端 84 个单元测试、前端 28 个组件测试全部通过
 - 数据库结构由 Flyway 管理（V1 建表 → V2 角色字典与管理员账号；业务数据不预置）
 
 ## 目录
@@ -264,8 +264,9 @@ pnpm dev
 6. **库存调整**：`total_stock` 不得低于"已借出数量"（`total - available`），调整后按此重算 `available_stock`。
 7. **删除保护**：有借阅记录的图书/读者不可删除（提示改为下架/停用）；被图书引用的作者/出版社/分类不可删除。
 8. **作者与出版社自由录入**：新增/编辑图书时直接输入作者姓名与出版社名称（不再要求先建主数据）。服务端按名称精确匹配，已存在则复用、不存在则自动建档；`authors.name`、`publishers.name` 上的唯一约束保证不会重复。也可继续用 `authorIds` / `publisherId` 提交已存在的 ID。
-9. **权限**：写操作仅 ADMIN/LIBRARIAN；读者只能读图书、自己的借阅与档案；用户与角色管理仅 ADMIN；不能删除/停用自己，不能移除最后一个管理员。
-10. **分类排序**：分类列表默认按编码（`code`）升序，与人工维护的编码序号（A/B/C、CS/MA…）一致；也可显式传 `sort=name,asc` 等白名单字段覆盖默认排序。
+9. **借还续的办理人**：馆员与管理员在「借阅管理」中可为任意读者办理借书/还书/续借；**读者本人可在「图书查询」页点「借阅」自助借书、在「我的借阅」页自助还书与续借**。读者提交的 `readerId` 会被忽略并强制为本人档案，还书/续借只能作用于自己的记录（越权返回 403）。
+10. **权限**：主数据与图书的写操作、读者档案管理仅 ADMIN/LIBRARIAN；用户与角色管理仅 ADMIN；不能删除/停用自己，不能移除最后一个管理员。
+11. **分类排序**：分类列表默认按编码（`code`）升序，与人工维护的编码序号（A/B/C、CS/MA…）一致；也可显式传 `sort=name,asc` 等白名单字段覆盖默认排序。
 
 更多细节见 [docs/er-diagram.md](docs/er-diagram.md)。
 
@@ -287,7 +288,8 @@ pnpm dev
 | 分类 | `/categories` 全套 | 登录 / ADMIN+LIBRARIAN | 查询 / 维护 |
 | 读者 | `GET /readers`、`GET/POST/PUT/DELETE /readers/{id}`、`PATCH /readers/{id}/status` | ADMIN/LIBRARIAN | 读者档案管理 |
 | 读者 | `GET /readers/me` | 登录 | 本人档案（含在借数量） |
-| 借阅 | `POST /borrows`、`POST /borrows/{id}/return`、`POST /borrows/{id}/renew` | ADMIN/LIBRARIAN | 借书、还书、续借 |
+| 借阅 | `POST /borrows` | 登录 | 借书：馆员/管理员必须传 `readerId` 代为办理；读者不传，服务端强制为本人档案 |
+| 借阅 | `POST /borrows/{id}/return`、`POST /borrows/{id}/renew` | 登录 | 还书、续借：馆员可操作任意记录，读者只能操作自己的记录（否则 403） |
 | 借阅 | `GET /borrows`、`GET /borrows/{id}` | ADMIN/LIBRARIAN | 分页：`keyword`、`status`、`readerId`、`bookId`、`overdueOnly`、`sort` |
 | 借阅 | `GET /borrows/my` | 登录 | 本人借阅记录 |
 | 统计 | `GET /stats/overview`、`GET /stats/popular-books?limit=10`、`GET /stats/category-distribution` | ADMIN/LIBRARIAN | 总览、排行、分类分布 |
@@ -311,9 +313,15 @@ curl -s "http://localhost:8080/api/v1/books?keyword=%E4%B8%89%E4%BD%93&page=1&si
   -H "Authorization: Bearer <accessToken>"
 
 # 借书 / 还书 / 续借
+# 馆员在柜台为读者办理：必须传 readerId
 curl -s -X POST http://localhost:8080/api/v1/borrows \
-  -H "Authorization: Bearer <accessToken>" -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer <staffToken>" -H 'Content-Type: application/json' \
   -d '{"readerId":2,"bookId":5,"remark":"柜台办理"}'
+# 读者自助借书：不传 readerId，后端自动绑定当前账号的借阅证
+curl -s -X POST http://localhost:8080/api/v1/borrows \
+  -H "Authorization: Bearer <readerToken>" -H 'Content-Type: application/json' \
+  -d '{"bookId":5}'
+# 还书 / 续借：馆员可操作任意记录，读者只能操作自己的记录
 curl -s -X POST http://localhost:8080/api/v1/borrows/12/return -H "Authorization: Bearer <accessToken>"
 curl -s -X POST http://localhost:8080/api/v1/borrows/12/renew  -H "Authorization: Bearer <accessToken>"
 
@@ -323,14 +331,14 @@ curl -s http://localhost:8080/api/v1/stats/overview -H "Authorization: Bearer <a
 
 ## 测试
 
-后端（76 例单元测试，纯 Mockito，不需要数据库）：
+后端（84 例单元测试，纯 Mockito，不需要数据库）：
 
 ```bash
 cd backend
 mvn test
 ```
 
-覆盖：JWT 生成/解析/过期/篡改、登录与刷新轮换、用户与角色（重名、最后一个管理员、自删保护）、图书（ISBN 规范化、库存重算、已借出下限、删除校验）、读者（卡号唯一、账号绑定、默认借阅上限）、作者、借还续与逾期罚款、统计聚合。
+覆盖：JWT 生成/解析/过期/篡改、登录与刷新轮换、读者自助注册、用户与角色（重名、最后一个管理员、自删保护）、图书（ISBN 规范化、库存重算、已借出下限、删除校验、作者/出版社自由录入）、读者（卡号唯一、账号绑定、默认借阅上限）、作者、分类默认排序、借还续与逾期罚款、读者自助借还续的越权拦截、统计聚合。
 
 集成测试（Testcontainers 启动真实 MySQL，需要 Docker）：
 
@@ -343,7 +351,7 @@ mvn -Pit verify
 
 ```bash
 cd frontend
-pnpm test        # Vitest + Testing Library，21 例
+pnpm test        # Vitest + Testing Library，28 例
 pnpm build       # tsc --noEmit + vite build
 ```
 

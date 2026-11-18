@@ -7,6 +7,7 @@ import com.library.common.exception.BizException;
 import com.library.common.exception.ErrorCode;
 import com.library.common.query.Sorts;
 import com.library.common.result.PageResult;
+import com.library.common.constant.RoleCodes;
 import com.library.config.BorrowProperties;
 import com.library.modules.book.entity.Book;
 import com.library.modules.book.mapper.BookMapper;
@@ -62,7 +63,8 @@ public class BorrowServiceImpl implements BorrowService {
     @Transactional
     public BorrowRecordVO borrow(BorrowRequest request) {
         // 读者状态是借阅资格的唯一入口：停用后借书、还书、续借都会被同一处拦截
-        Reader reader = requireActiveReader(request.readerId(), "借书");
+        Long readerId = resolveBorrower(request.readerId());
+        Reader reader = requireActiveReader(readerId, "借书");
 
         Book book = bookMapper.selectById(request.bookId());
         if (book == null) {
@@ -113,6 +115,7 @@ public class BorrowServiceImpl implements BorrowService {
         if (!STATUS_BORROWED.equals(record.getStatus())) {
             throw new BizException(ErrorCode.CONFLICT, "该借阅记录已归还，无需重复操作");
         }
+        ensureBorrowRecordOwnership(record);
         requireActiveReader(record.getReaderId(), "归还（请先启用该读者）");
         LocalDate today = LocalDate.now();
         record.setReturnDate(today);
@@ -130,6 +133,7 @@ public class BorrowServiceImpl implements BorrowService {
         if (!STATUS_BORROWED.equals(record.getStatus())) {
             throw new BizException(ErrorCode.CONFLICT, "已归还的借阅记录不能续借");
         }
+        ensureBorrowRecordOwnership(record);
         requireActiveReader(record.getReaderId(), "续借（请先启用该读者）");
         LocalDate today = LocalDate.now();
         if (record.getDueDate().isBefore(today) && !borrowProperties.allowRenewWhenOverdue()) {
@@ -187,15 +191,53 @@ public class BorrowServiceImpl implements BorrowService {
 
     @Override
     public PageResult<BorrowRecordVO> myList(int page, int size, String status) {
-        Long userId = SecurityUtils.currentUserId();
-        Reader reader = readerMapper.selectOne(Wrappers.<Reader>lambdaQuery().eq(Reader::getUserId, userId));
-        if (reader == null) {
-            throw new BizException(ErrorCode.NOT_FOUND, "当前账号尚未绑定读者档案");
-        }
-        return list(page, size, null, status, reader.getId(), null, null, null);
+        return list(page, size, null, status, currentReaderId(), null, null, null);
     }
 
     // ---------------------------------------------------------------- 内部方法
+
+    /**
+     * 借书的读者身份：馆员/管理员代为办理（必须显式指定 readerId）；
+     * 读者本人自助借书时忽略请求里的 readerId，强制使用自己的档案，避免越权替他人借书。
+     */
+    private Long resolveBorrower(Long requestedReaderId) {
+        if (isStaff()) {
+            if (requestedReaderId == null) {
+                throw new BizException(ErrorCode.BAD_REQUEST, "馆员办理借书时必须指定读者");
+            }
+            return requestedReaderId;
+        }
+        Long ownReaderId = currentReaderId();
+        if (requestedReaderId != null && !ownReaderId.equals(requestedReaderId)) {
+            throw new BizException(ErrorCode.FORBIDDEN, "只能为自己办理借阅");
+        }
+        return ownReaderId;
+    }
+
+    /**
+     * 读者只能操作自己的借阅记录；馆员/管理员不受限制。
+     */
+    private void ensureBorrowRecordOwnership(BorrowRecord record) {
+        if (isStaff()) {
+            return;
+        }
+        if (!currentReaderId().equals(record.getReaderId())) {
+            throw new BizException(ErrorCode.FORBIDDEN, "只能操作自己的借阅记录");
+        }
+    }
+
+    private boolean isStaff() {
+        return SecurityUtils.hasRole(RoleCodes.ADMIN) || SecurityUtils.hasRole(RoleCodes.LIBRARIAN);
+    }
+
+    private Long currentReaderId() {
+        Reader reader = readerMapper.selectOne(Wrappers.<Reader>lambdaQuery()
+                .eq(Reader::getUserId, SecurityUtils.currentUserId()));
+        if (reader == null) {
+            throw new BizException(ErrorCode.NOT_FOUND, "当前账号尚未绑定读者档案");
+        }
+        return reader.getId();
+    }
 
     private Reader requireActiveReader(Long readerId, String action) {
         Reader reader = readerMapper.selectById(readerId);

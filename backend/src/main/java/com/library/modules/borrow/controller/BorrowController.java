@@ -37,22 +37,19 @@ public class BorrowController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN','LIBRARIAN')")
-    @Operation(summary = "借书")
+    @Operation(summary = "借书（馆员可为任意读者办理，读者只能为自己借书）")
     public ApiResponse<BorrowRecordVO> borrow(@Valid @RequestBody BorrowRequest request) {
         return ApiResponse.ok(borrowService.borrow(request));
     }
 
     @PostMapping("/{id}/return")
-    @PreAuthorize("hasAnyRole('ADMIN','LIBRARIAN')")
-    @Operation(summary = "还书（自动结算逾期罚款）")
+    @Operation(summary = "还书（自动结算逾期罚款；读者只能归还自己的记录）")
     public ApiResponse<BorrowRecordVO> returnBook(@PathVariable Long id) {
         return ApiResponse.ok(borrowService.returnBook(id));
     }
 
     @PostMapping("/{id}/renew")
-    @PreAuthorize("hasAnyRole('ADMIN','LIBRARIAN')")
-    @Operation(summary = "续借")
+    @Operation(summary = "续借（读者只能续借自己的记录）")
     public ApiResponse<BorrowRecordVO> renew(@PathVariable Long id) {
         return ApiResponse.ok(borrowService.renew(id));
     }

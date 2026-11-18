@@ -18,10 +18,11 @@ import {
   message,
 } from 'antd';
 import { EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import dayjs from 'dayjs';
 import type { ColumnsType } from 'antd/es/table';
-import { bookApi, namedApi } from '../../api';
+import { bookApi, borrowApi, configApi, namedApi } from '../../api';
 import { errorMessage } from '../../api/http';
-import type { BookVO, NamedVO, PageResult } from '../../api/types';
+import type { BookVO, BorrowRules, NamedVO, PageResult } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
 import BookFormModal from './BookFormModal';
 
@@ -39,6 +40,16 @@ export default function BooksPage() {
   const [stockTarget, setStockTarget] = useState<BookVO | null>(null);
   const [stockValue, setStockValue] = useState(1);
   const [stockSaving, setStockSaving] = useState(false);
+  const [rules, setRules] = useState<BorrowRules | null>(null);
+  const [borrowingId, setBorrowingId] = useState<number | null>(null);
+
+  useEffect(() => {
+    // 读者借阅确认框要展示借期，馆员在借阅管理页办理，不需要这份规则
+    if (isStaff) {
+      return;
+    }
+    configApi.borrowRules().then(setRules).catch(() => undefined);
+  }, [isStaff]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -242,7 +253,51 @@ export default function BooksPage() {
         </Space>
       ),
     });
+  } else {
+    // 读者自助借书入口：只对可借图书显示，借阅人由后端强制为当前账号
+    columns.push({
+      title: '操作',
+      key: 'actions',
+      width: 110,
+      fixed: 'right',
+      render: (_, record) => {
+        const borrowable = record.status === 'AVAILABLE' && record.availableStock > 0;
+        if (!borrowable) {
+          return (
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              {record.status === 'AVAILABLE' ? '无库存' : '已下架'}
+            </Typography.Text>
+          );
+        }
+        return (
+          <Popconfirm
+            title={`借阅《${record.title}》？`}
+            description={rules ? `借期 ${rules.loanDays} 天，到期 ${dayjs().add(rules.loanDays, 'day').format('YYYY-MM-DD')}` : undefined}
+            okText="借阅"
+            cancelText="取消"
+            onConfirm={() => borrow(record)}
+          >
+            <Button size="small" type="primary" loading={borrowingId === record.id}>
+              借阅
+            </Button>
+          </Popconfirm>
+        );
+      },
+    });
   }
+
+  const borrow = async (record: BookVO) => {
+    setBorrowingId(record.id);
+    try {
+      const created = await borrowApi.borrow({ bookId: record.id });
+      message.success(`借阅成功，应还日期 ${created.dueDate}`);
+      load();
+    } catch (err) {
+      message.error(errorMessage(err));
+    } finally {
+      setBorrowingId(null);
+    }
+  };
 
   return (
     <Card
