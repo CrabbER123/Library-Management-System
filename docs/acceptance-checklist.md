@@ -124,6 +124,8 @@ docker compose ps
 - [ ] 重启容器后数据仍在（`mysql-data` 卷持久化）
 - [ ] `docker compose down` 停止；`docker compose down -v` 清空数据
 
+> **本机验证状态**：`docker compose config --quiet` 已通过（services = mysql/backend/frontend），但 `up --build` 未能在当前机器上执行 —— Docker Desktop 的 Linux 引擎不可用（`docker info` 返回 `500 Internal Server Error ... /pipe/dockerDesktopLinuxEngine`，`wsl -l -v` 提示未安装 WSL 发行版）。这不是项目配置问题，排查顺序：① 在 BIOS 开启虚拟化（VT-x/AMD-V）；② `wsl --install` 并重启；③ Docker Desktop → Settings → General 勾选 WSL 2 based engine；④ `docker info` 能返回版本号后再执行上面的命令。
+
 ## 11. 文档完整性
 
 - [ ] `README.md`：环境要求、启动步骤、默认账号、接口示例、常见问题

@@ -20,8 +20,10 @@ services:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
       - --default-time-zone=+08:00
-    ports:
-      - "${MYSQL_PORT:-3306}:3306"
+    # 默认不把 3306 暴露到宿主机：避免与本机已安装的 MySQL 端口冲突。
+    # 如需用客户端直连，取消下面两行注释（并确认宿主机 3306 未被占用）。
+    # ports:
+    #   - "${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql-data:/var/lib/mysql
     healthcheck:

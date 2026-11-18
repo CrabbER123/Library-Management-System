@@ -174,7 +174,7 @@ docker compose down                # 停止（保留数据）
 docker compose down -v             # 停止并清空数据库数据
 ```
 
-> MySQL 端口默认不映射到宿主机（容器内网访问即可）；如需用客户端连库，可在 `docker-compose.yml` 中放开 `3306:3306`。
+> MySQL 端口默认不映射到宿主机（避免与本机已安装的 MySQL 冲突，后端通过 compose 内网访问即可）；如需用客户端连库，取消 `docker-compose.yml` 中 `ports` 注释，或用 `docker compose exec mysql mysql -uroot -p` 进入容器操作。
 
 ### 方式二：本地开发
 
@@ -345,8 +345,9 @@ pnpm build       # tsc --noEmit + vite build
 4. **401 与 403 的区别**：401 = 未登录 / 令牌无效或过期；403 = 已登录但角色不足（如读者访问 `/users`）。
 5. **refresh token 用不了（40102）**：令牌是一次性轮换的，旧 token 在刷新后立即失效；前端已做单飞刷新与重放。
 6. **compose 报 `project name must not be empty`**：本项目中文目录名无法推导项目名，`docker-compose.yml` 顶部已显式写 `name: library`，请勿删除。
-7. **前端跨域失败**：开发环境确认 Vite 代理存在；生产环境确认 Nginx `/api/` 代理与后端 `CORS_ALLOWED_ORIGINS`。
-8. **中文乱码**：库/表/连接均需 `utf8mb4`，JDBC URL 已带 `characterEncoding=utf8`。
+7. **`docker info` 报 `500 Internal Server Error (...dockerDesktopLinuxEngine)`**：Docker Desktop 的 Linux 引擎没起来，通常是 BIOS 未开虚拟化或 WSL 2 未安装。处理：BIOS 开启 VT-x/AMD-V → `wsl --install` 重启 → Docker Desktop 勾选 "Use WSL 2 based engine"。
+8. **前端跨域失败**：开发环境确认 Vite 代理存在；生产环境确认 Nginx `/api/` 代理与后端 `CORS_ALLOWED_ORIGINS`。
+9. **中文乱码**：库/表/连接均需 `utf8mb4`，JDBC URL 已带 `characterEncoding=utf8`。
 
 ## 后续迭代建议
 
