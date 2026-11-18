@@ -14,6 +14,7 @@ import type {
   ReaderPayload,
   ReaderVO,
   RegisterPayload,
+  RoleVO,
   UserVO,
 } from './types';
 
@@ -41,7 +42,7 @@ export interface UserQuery {
 
 export const userApi = {
   list: (params: UserQuery) => http.get('/users', { params }) as unknown as Promise<PageResult<UserVO>>,
-  roles: () => http.get('/roles') as unknown as Promise<string[]>,
+  roles: () => http.get('/roles') as unknown as Promise<RoleVO[]>,
   create: (payload: Record<string, unknown>) => http.post('/users', payload) as unknown as Promise<UserVO>,
   update: (id: number, payload: Record<string, unknown>) =>
     http.put(`/users/${id}`, payload) as unknown as Promise<UserVO>,

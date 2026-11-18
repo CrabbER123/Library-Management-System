@@ -17,7 +17,7 @@ import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { userApi } from '../../api';
 import { errorMessage } from '../../api/http';
-import type { PageResult, UserVO } from '../../api/types';
+import type { PageResult, RoleVO, UserVO } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
 
 const EMPTY: PageResult<UserVO> = { records: [], total: 0, page: 1, size: 10, pages: 0 };
@@ -27,6 +27,13 @@ const ROLE_LABEL: Record<string, string> = {
   LIBRARIAN: '馆员',
   READER: '读者',
 };
+
+/** 角色字典接口异常时的兜底，保证下拉与标签至少可用 */
+const DEFAULT_ROLES: RoleVO[] = [
+  { id: 1, code: 'ADMIN', name: '管理员', description: null },
+  { id: 2, code: 'LIBRARIAN', name: '馆员', description: null },
+  { id: 3, code: 'READER', name: '读者', description: null },
+];
 
 const ROLE_COLOR: Record<string, string> = {
   ADMIN: 'gold',
@@ -48,7 +55,7 @@ export default function UsersPage() {
   const [form] = Form.useForm<AccountForm>();
   const [data, setData] = useState<PageResult<UserVO>>(EMPTY);
   const [loading, setLoading] = useState(false);
-  const [roles, setRoles] = useState<string[]>(['ADMIN', 'LIBRARIAN', 'READER']);
+  const [roles, setRoles] = useState<RoleVO[]>(DEFAULT_ROLES);
   const [keyword, setKeyword] = useState('');
   const [query, setQuery] = useState({ page: 1, size: 10, keyword: '', role: undefined as string | undefined, status: undefined as string | undefined });
   const [open, setOpen] = useState(false);
@@ -79,8 +86,22 @@ export default function UsersPage() {
   }, [load]);
 
   useEffect(() => {
-    userApi.roles().then(setRoles).catch(() => undefined);
+    userApi
+      .roles()
+      .then((list) => {
+        if (Array.isArray(list) && list.length > 0) {
+          setRoles(list);
+        }
+      })
+      .catch(() => undefined);
   }, []);
+
+  const roleLabel = useCallback(
+    (code: string) => roles.find((role) => role.code === code)?.name || ROLE_LABEL[code] || code,
+    [roles],
+  );
+
+  const roleOptions = roles.map((role) => ({ value: role.code, label: roleLabel(role.code) }));
 
   const openCreate = () => {
     setEditing(null);
@@ -179,9 +200,9 @@ export default function UsersPage() {
       width: 180,
       render: (rolesValue: string[]) => (
         <Space size={[0, 4]} wrap>
-          {rolesValue.map((role) => (
+          {(rolesValue ?? []).map((role) => (
             <Tag key={role} color={ROLE_COLOR[role]}>
-              {ROLE_LABEL[role] ?? role}
+              {roleLabel(role)}
             </Tag>
           ))}
         </Space>
@@ -249,7 +270,7 @@ export default function UsersPage() {
             placeholder="角色"
             style={{ width: 120 }}
             value={query.role}
-            options={roles.map((role) => ({ value: role, label: ROLE_LABEL[role] ?? role }))}
+            options={roleOptions}
             onChange={(value) => setQuery((prev) => ({ ...prev, role: value, page: 1 }))}
           />
           <Select
@@ -336,7 +357,7 @@ export default function UsersPage() {
           <Form.Item name="roles" label="角色" rules={[{ required: true, message: '至少选择一个角色' }]}>
             <Select
               mode="multiple"
-              options={roles.map((role) => ({ value: role, label: ROLE_LABEL[role] ?? role }))}
+              options={roleOptions}
               placeholder="选择角色"
             />
           </Form.Item>

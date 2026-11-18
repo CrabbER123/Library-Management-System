@@ -33,6 +33,14 @@ export interface UserVO {
   lastLoginAt: string | null;
 }
 
+/** GET /roles 返回的角色字典项 */
+export interface RoleVO {
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
+}
+
 export interface CurrentUser {
   id: number;
   username: string;

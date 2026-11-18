@@ -13,6 +13,7 @@ import {
 } from '@ant-design/icons';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import ErrorBoundary from './ErrorBoundary';
 
 const { Header, Sider, Content } = Layout;
 
@@ -120,7 +121,9 @@ export default function AppLayout() {
           </Dropdown>
         </Header>
         <Content style={{ margin: 16 }}>
-          <Outlet />
+          <ErrorBoundary resetKey={location.pathname}>
+            <Outlet />
+          </ErrorBoundary>
         </Content>
       </Layout>
     </Layout>

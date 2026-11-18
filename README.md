@@ -3,7 +3,7 @@
 一个可直接运行、分层清晰、带测试与文档的图书管理系统，覆盖**账号与 RBAC 权限、图书与主数据、读者、借还续、逾期罚款、统计报表**，并提供 React 管理端与 Docker Compose 一键部署。
 
 - 当前进度：**阶段 0–7 全部完成**（MVP 交付）
-- 后端 68 个单元测试、前端 18 个组件测试全部通过
+- 后端 76 个单元测试、前端 21 个组件测试全部通过
 - 数据库结构由 Flyway 管理（V1 建表 → V2 角色字典与管理员账号；业务数据不预置）
 
 ## 目录
@@ -264,6 +264,7 @@ pnpm dev
 6. **删除保护**：有借阅记录的图书/读者不可删除（提示改为下架/停用）；被图书引用的作者/出版社/分类不可删除。
 7. **作者与出版社自由录入**：新增/编辑图书时直接输入作者姓名与出版社名称（不再要求先建主数据）。服务端按名称精确匹配，已存在则复用、不存在则自动建档；`authors.name`、`publishers.name` 上的唯一约束保证不会重复。也可继续用 `authorIds` / `publisherId` 提交已存在的 ID。
 8. **权限**：写操作仅 ADMIN/LIBRARIAN；读者只能读图书、自己的借阅与档案；用户与角色管理仅 ADMIN；不能删除/停用自己，不能移除最后一个管理员。
+9. **分类排序**：分类列表默认按编码（`code`）倒序，新建的分类自然排在最前；也可显式传 `sort=name,asc` 等白名单字段覆盖默认排序。
 
 更多细节见 [docs/er-diagram.md](docs/er-diagram.md)。
 
@@ -321,7 +322,7 @@ curl -s http://localhost:8080/api/v1/stats/overview -H "Authorization: Bearer <a
 
 ## 测试
 
-后端（68 例单元测试，纯 Mockito，不需要数据库）：
+后端（76 例单元测试，纯 Mockito，不需要数据库）：
 
 ```bash
 cd backend
@@ -341,7 +342,7 @@ mvn -Pit verify
 
 ```bash
 cd frontend
-pnpm test        # Vitest + Testing Library，18 例
+pnpm test        # Vitest + Testing Library，21 例
 pnpm build       # tsc --noEmit + vite build
 ```
 

@@ -45,7 +45,8 @@ public class CategoryServiceImpl implements CategoryService {
             wrapper.and(w -> w.like("name", kw).or().like("code", kw).or().like("description", kw));
         }
         if (Sorts.apply(wrapper, sort, SORT_COLUMNS) == null) {
-            Sorts.applyDefault(wrapper, "name", true);
+            // 分类默认按编码倒序：编码是人工维护的业务序号，倒序更贴近“新建在前”的使用习惯
+            Sorts.applyDefault(wrapper, "code", false);
         }
 
         Page<Category> result = categoryMapper.selectPage(new Page<>(safePage, safeSize), wrapper);

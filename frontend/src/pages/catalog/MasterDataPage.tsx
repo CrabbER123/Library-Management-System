@@ -42,10 +42,20 @@ interface Props {
   columns: ColumnDef[];
   fields: FieldDef[];
   keywordPlaceholder: string;
+  /** 列表默认排序，格式 `字段,asc|desc`；缺省按名称升序 */
+  defaultSort?: string;
 }
 
 /** 作者/出版社/分类共用的一览页：结构一致，仅字段配置不同 */
-export default function MasterDataPage({ resource, title, description, columns, fields, keywordPlaceholder }: Props) {
+export default function MasterDataPage({
+  resource,
+  title,
+  description,
+  columns,
+  fields,
+  keywordPlaceholder,
+  defaultSort = 'name,asc',
+}: Props) {
   const [form] = Form.useForm<Record<string, string | number | null | undefined>>();
   const [data, setData] = useState<PageResult<NamedVO>>({ records: [], total: 0, page: 1, size: 10, pages: 0 });
   const [loading, setLoading] = useState(false);
@@ -62,7 +72,7 @@ export default function MasterDataPage({ resource, title, description, columns, 
         page: query.page,
         size: query.size,
         keyword: query.keyword || undefined,
-        sort: 'name,asc',
+        sort: defaultSort,
       });
       setData(result);
     } catch (err) {
@@ -70,7 +80,7 @@ export default function MasterDataPage({ resource, title, description, columns, 
     } finally {
       setLoading(false);
     }
-  }, [resource, query]);
+  }, [resource, query, defaultSort]);
 
   useEffect(() => {
     load();

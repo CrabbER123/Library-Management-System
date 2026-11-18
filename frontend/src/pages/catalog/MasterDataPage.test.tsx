@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mock } from 'vitest';
@@ -78,6 +78,32 @@ describe('MasterDataPage', () => {
 
     expect(await screen.findByText('佚名')).toBeInTheDocument();
     expect(await screen.findByText('—')).toBeInTheDocument();
+  });
+
+  it('按 defaultSort 传入默认排序（分类页要求按编码倒序）', async () => {
+    render(
+      <MasterDataPage
+        resource="categories"
+        title="分类"
+        description="单层分类"
+        keywordPlaceholder="名称 / 编码"
+        defaultSort="code,desc"
+        columns={[
+          { key: 'name', title: '名称' },
+          { key: 'code', title: '编码' },
+        ]}
+        fields={[{ name: 'name', label: '名称', required: true }]}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(listMock).toHaveBeenCalledWith('categories', {
+        page: 1,
+        size: 10,
+        keyword: undefined,
+        sort: 'code,desc',
+      }),
+    );
   });
 
   it('点击新增按钮打开按字段配置生成的表单弹窗', async () => {
