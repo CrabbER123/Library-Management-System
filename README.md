@@ -36,12 +36,17 @@ Flyway 保证多环境数据库结构一致；JWT 无状态鉴权便于前后端
 │       │   │   └── modules/
 │       │   │       ├── auth/        # 登录、刷新、登出、当前用户
 │       │   │       ├── user/        # 用户、角色、用户-角色
-│       │   │       └── reader/      # 读者档案（阶段 3 完善）
+│       │   │       ├── reader/      # 读者档案与借阅证
+│       │   │       ├── author/      # 作者
+│       │   │       ├── publisher/   # 出版社
+│       │   │       ├── category/    # 分类
+│       │   │       ├── book/        # 图书与图书-作者关联
+│       │   │       └── config/      # 只读系统配置（借阅规则）
 │       │   └── resources/
 │       │       ├── application.yml
 │       │       ├── application-dev.yml
 │       │       ├── application-prod.yml
-│       │       └── db/migration/    # V1 建表、V2 种子数据
+│       │       └── db/migration/    # V1 建表、V2 账号种子、V3 图书主数据种子
 │       └── test/java/com/library/   # 单元测试 + 集成测试
 └── README.md
 ```
@@ -143,11 +148,47 @@ curl -s -X POST http://localhost:8080/api/v1/auth/refresh \
 错误码约定：`0` 成功；`401xx` 未认证/令牌失效；`403xx` 无权限；`404xx` 不存在；`409xx` 冲突/重复；
 `422xx` 业务规则或参数校验失败（如库存不足 `42201`、超出借阅上限 `42202`）；`50000` 服务器内部错误。
 
+## 业务接口一览（阶段 2–3）
+
+统一前缀 `/api/v1`，除登录/刷新外均需 `Authorization: Bearer <accessToken>`。
+
+| 模块 | 方法与路径 | 权限 | 说明 |
+| --- | --- | --- | --- |
+| 认证 | `POST /auth/login`、`POST /auth/refresh` | 匿名 | 登录、刷新（轮换旧 refresh token） |
+| 认证 | `POST /auth/logout`、`GET /auth/me` | 登录 | 注销、当前用户（含 readerId） |
+| 用户 | `GET/POST /users`、`GET/PUT/DELETE /users/{id}`、`PATCH /users/{id}/status`、`PUT /users/{id}/roles` | ADMIN | 用户与角色管理 |
+| 角色 | `GET /roles` | ADMIN | 角色字典 |
+| 图书 | `GET /books`、`GET /books/{id}` | 登录 | 分页搜索：`keyword`（书名/副标题/ISBN/作者名）、`categoryId`、`authorId`、`publisherId`、`status`、`sort` |
+| 图书 | `POST /books`、`PUT /books/{id}`、`DELETE /books/{id}` | ADMIN/LIBRARIAN | 新增/编辑/删除（有借阅记录时拒绝删除） |
+| 图书 | `PATCH /books/{id}/status`、`PUT /books/{id}/stock` | ADMIN/LIBRARIAN | 上下架、调整总库存（不得低于已借出数） |
+| 作者 | `GET /authors`、`GET /authors/{id}` | 登录 | 分页搜索 |
+| 作者 | `POST /authors`、`PUT /authors/{id}`、`DELETE /authors/{id}` | ADMIN/LIBRARIAN | 删除前检查是否被图书引用 |
+| 出版社 | `/publishers` 同上 | 登录 / ADMIN+LIBRARIAN | 同上 |
+| 分类 | `/categories` 同上 | 登录 / ADMIN+LIBRARIAN | 同上 |
+| 读者 | `GET /readers`、`GET /readers/{id}`、`POST /readers`、`PUT /readers/{id}`、`PATCH /readers/{id}/status`、`DELETE /readers/{id}` | ADMIN/LIBRARIAN | 借阅证号唯一；可绑定登录账号；删除前检查借阅记录 |
+| 读者 | `GET /readers/me` | 登录 | 读者本人档案（含当前在借数量） |
+| 配置 | `GET /configs/borrow-rules` | 登录 | 借期/续借/罚款规则（前端据此展示） |
+
+示例：新增图书（ISBN 允许带连字符，服务端会规范化并校验 10/13 位）：
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/books \
+  -H "Authorization: Bearer <accessToken>" -H 'Content-Type: application/json' \
+  -d '{"isbn":"978-7-5086-8353-0","title":"示例图书","authorIds":[2],"publisherId":3,"categoryId":2,"totalStock":3}'
+```
+
+图书列表（关键字会同时匹配书名、副标题、ISBN 与作者名）：
+
+```bash
+curl -s "http://localhost:8080/api/v1/books?keyword=%E4%B8%89%E4%BD%93&page=1&size=10&sort=id,desc" \
+  -H "Authorization: Bearer <accessToken>"
+```
+
 ## 测试
 
 ```bash
 cd backend
-mvn test          # 单元测试（JWT、登录、刷新、用户管理规则）
+mvn test          # 单元测试（42 例：JWT、登录/刷新、用户管理、图书、读者、作者规则）
 ```
 
 集成测试基于 Testcontainers 启动真实 MySQL，需要 Docker：
@@ -159,7 +200,7 @@ mvn -Pit verify   # 集成测试：登录、/auth/me、匿名 401、读者越权
 ## 已实现与后续规划
 
 - [x] 阶段 2：工程骨架、Flyway 建表与种子数据、JWT 登录/刷新/登出、RBAC、用户与角色管理、统一异常与响应
-- [ ] 阶段 3：作者/出版社/分类/图书/读者 CRUD 与分页搜索
+- [x] 阶段 3：作者/出版社/分类/图书/读者 CRUD、分页搜索与排序、库存一致性校验、引用检查删除、图书主数据种子（V3）
 - [ ] 阶段 4：借书/还书/续借、逾期与罚款、事务与并发控制、核心规则单测
 - [ ] 阶段 5：前端页面、权限路由、图书/读者/借阅界面
 - [ ] 阶段 6：统计报表、种子数据扩充
