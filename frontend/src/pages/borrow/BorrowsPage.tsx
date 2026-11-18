@@ -71,7 +71,8 @@ export default function BorrowsPage() {
 
   const searchReaders = (value: string) => {
     readerApi
-      .list({ keyword: value || undefined, size: 20 })
+      // 只允许给正常状态的读者办借书；停用读者由后端再次拦截（READER_INACTIVE）
+      .list({ keyword: value || undefined, size: 20, status: 'ACTIVE' })
       .then((result) => setReaders(result.records))
       .catch(() => setReaders([]));
   };

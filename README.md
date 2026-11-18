@@ -257,14 +257,15 @@ pnpm dev
 ## 核心业务规则
 
 1. **借书**：读者存在 → 状态正常 → 图书存在且 `AVAILABLE` → 在借数未超限 → 未重复在借 → 条件更新扣减库存（`available_stock > 0`）→ 插入借阅记录。任一步失败整体回滚。
-2. **还书**：仅 `BORROWED` 可还；按 `return_date - due_date` 计算逾期天数并结算罚款（`天数 × fine-per-day`，可按 `max-fine-amount` 封顶）；库存回补（不超过总库存）。
-3. **续借**：仅 `BORROWED` 可续；逾期（默认）不可续；续借次数 < 2；`due_date += 15`，`renew_times += 1`。
-4. **重复在借**：`borrow_records` 的生成列 `active_flag`（BORROWED=1，否则 NULL）+ `UNIQUE(reader_id, book_id, active_flag)`，应用层提示 + 数据库兜底。
-5. **库存调整**：`total_stock` 不得低于"已借出数量"（`total - available`），调整后按此重算 `available_stock`。
-6. **删除保护**：有借阅记录的图书/读者不可删除（提示改为下架/停用）；被图书引用的作者/出版社/分类不可删除。
-7. **作者与出版社自由录入**：新增/编辑图书时直接输入作者姓名与出版社名称（不再要求先建主数据）。服务端按名称精确匹配，已存在则复用、不存在则自动建档；`authors.name`、`publishers.name` 上的唯一约束保证不会重复。也可继续用 `authorIds` / `publisherId` 提交已存在的 ID。
-8. **权限**：写操作仅 ADMIN/LIBRARIAN；读者只能读图书、自己的借阅与档案；用户与角色管理仅 ADMIN；不能删除/停用自己，不能移除最后一个管理员。
-9. **分类排序**：分类列表默认按编码（`code`）升序，与人工维护的编码序号（A/B/C、CS/MA…）一致；也可显式传 `sort=name,asc` 等白名单字段覆盖默认排序。
+2. **读者状态即操作资格**：读者被停用（`SUSPENDED`）后，**借阅、归还、续借**三条路径统一返回 `422/42203`，借阅记录与库存都不会变动；需先由馆员在「读者管理 → 启用」恢复，已借出的图书在这段时间仍按逾期规则累计罚款。
+3. **还书**：仅 `BORROWED` 可还；按 `return_date - due_date` 计算逾期天数并结算罚款（`天数 × fine-per-day`，可按 `max-fine-amount` 封顶）；库存回补（不超过总库存）。
+4. **续借**：仅 `BORROWED` 可续；逾期（默认）不可续；续借次数 < 2；`due_date += 15`，`renew_times += 1`。
+5. **重复在借**：`borrow_records` 的生成列 `active_flag`（BORROWED=1，否则 NULL）+ `UNIQUE(reader_id, book_id, active_flag)`，应用层提示 + 数据库兜底。
+6. **库存调整**：`total_stock` 不得低于"已借出数量"（`total - available`），调整后按此重算 `available_stock`。
+7. **删除保护**：有借阅记录的图书/读者不可删除（提示改为下架/停用）；被图书引用的作者/出版社/分类不可删除。
+8. **作者与出版社自由录入**：新增/编辑图书时直接输入作者姓名与出版社名称（不再要求先建主数据）。服务端按名称精确匹配，已存在则复用、不存在则自动建档；`authors.name`、`publishers.name` 上的唯一约束保证不会重复。也可继续用 `authorIds` / `publisherId` 提交已存在的 ID。
+9. **权限**：写操作仅 ADMIN/LIBRARIAN；读者只能读图书、自己的借阅与档案；用户与角色管理仅 ADMIN；不能删除/停用自己，不能移除最后一个管理员。
+10. **分类排序**：分类列表默认按编码（`code`）升序，与人工维护的编码序号（A/B/C、CS/MA…）一致；也可显式传 `sort=name,asc` 等白名单字段覆盖默认排序。
 
 更多细节见 [docs/er-diagram.md](docs/er-diagram.md)。
 

@@ -61,13 +61,8 @@ public class BorrowServiceImpl implements BorrowService {
     @Override
     @Transactional
     public BorrowRecordVO borrow(BorrowRequest request) {
-        Reader reader = readerMapper.selectById(request.readerId());
-        if (reader == null) {
-            throw new BizException(ErrorCode.NOT_FOUND, "读者不存在: " + request.readerId());
-        }
-        if (!READER_ACTIVE.equals(reader.getStatus())) {
-            throw new BizException(ErrorCode.READER_INACTIVE, "该读者已被停用，不能借书");
-        }
+        // 读者状态是借阅资格的唯一入口：停用后借书、还书、续借都会被同一处拦截
+        Reader reader = requireActiveReader(request.readerId(), "借书");
 
         Book book = bookMapper.selectById(request.bookId());
         if (book == null) {
@@ -118,6 +113,7 @@ public class BorrowServiceImpl implements BorrowService {
         if (!STATUS_BORROWED.equals(record.getStatus())) {
             throw new BizException(ErrorCode.CONFLICT, "该借阅记录已归还，无需重复操作");
         }
+        requireActiveReader(record.getReaderId(), "归还（请先启用该读者）");
         LocalDate today = LocalDate.now();
         record.setReturnDate(today);
         record.setStatus(STATUS_RETURNED);
@@ -134,6 +130,7 @@ public class BorrowServiceImpl implements BorrowService {
         if (!STATUS_BORROWED.equals(record.getStatus())) {
             throw new BizException(ErrorCode.CONFLICT, "已归还的借阅记录不能续借");
         }
+        requireActiveReader(record.getReaderId(), "续借（请先启用该读者）");
         LocalDate today = LocalDate.now();
         if (record.getDueDate().isBefore(today) && !borrowProperties.allowRenewWhenOverdue()) {
             throw new BizException(ErrorCode.RENEW_OVERDUE, "图书已逾期，请先归还并缴纳罚款");
@@ -199,6 +196,17 @@ public class BorrowServiceImpl implements BorrowService {
     }
 
     // ---------------------------------------------------------------- 内部方法
+
+    private Reader requireActiveReader(Long readerId, String action) {
+        Reader reader = readerMapper.selectById(readerId);
+        if (reader == null) {
+            throw new BizException(ErrorCode.NOT_FOUND, "读者不存在");
+        }
+        if (!READER_ACTIVE.equals(reader.getStatus())) {
+            throw new BizException(ErrorCode.READER_INACTIVE, "该读者已被停用，不能" + action);
+        }
+        return reader;
+    }
 
     private BorrowRecord requireRecord(Long id) {
         BorrowRecord record = borrowRecordMapper.selectById(id);

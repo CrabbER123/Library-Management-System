@@ -167,9 +167,19 @@ export default function ReadersPage() {
           <Button size="small" type="link" onClick={() => openEdit(record)}>
             编辑
           </Button>
-          <Button size="small" type="link" onClick={() => toggleStatus(record)}>
-            {record.status === 'ACTIVE' ? '停用' : '启用'}
-          </Button>
+          <Popconfirm
+            title={record.status === 'ACTIVE' ? '停用读者' : '启用读者'}
+            description={
+              record.status === 'ACTIVE'
+                ? '停用后该读者不能再借阅、归还或续借图书，已借出的图书仍会计入逾期。确认停用？'
+                : '启用后该读者恢复借阅、归还、续借权限。确认启用？'
+            }
+            onConfirm={() => toggleStatus(record)}
+          >
+            <Button size="small" type="link">
+              {record.status === 'ACTIVE' ? '停用' : '启用'}
+            </Button>
+          </Popconfirm>
           <Popconfirm
             title="删除读者"
             description="有借阅记录的读者不能删除，可改为停用。确认删除？"
@@ -262,7 +272,7 @@ export default function ReadersPage() {
             <Select
               options={[
                 { value: 'ACTIVE', label: '正常' },
-                { value: 'SUSPENDED', label: '停用（不能借书）' },
+                { value: 'SUSPENDED', label: '停用（不能借阅、归还、续借）' },
               ]}
             />
           </Form.Item>

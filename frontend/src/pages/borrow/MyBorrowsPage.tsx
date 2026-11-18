@@ -106,6 +106,15 @@ export default function MyBorrowsPage() {
                 {profile.borrowingCount} / {profile.maxBorrow}
               </Descriptions.Item>
             </Descriptions>
+            {profile.status === 'SUSPENDED' && (
+              <Alert
+                style={{ marginTop: 12 }}
+                type="error"
+                showIcon
+                message="借阅证已停用"
+                description="停用期间不能借阅、归还或续借图书，已借出的图书仍会按逾期规则计算罚款。请联系馆员重新启用。"
+              />
+            )}
             {rules && (
               <Typography.Text type="secondary">
                 借期 {rules.loanDays} 天，可续借 {rules.maxRenewTimes} 次（每次 +{rules.renewDays} 天）；逾期按 {rules.finePerDay} 元/天计收罚款。

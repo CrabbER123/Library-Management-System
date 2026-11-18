@@ -165,6 +165,7 @@ class BorrowServiceImplTest {
     void returnSettlesFineForOverdueDays() {
         BorrowRecord record = borrowed(LocalDate.now().minusDays(10), 0);
         when(borrowRecordMapper.selectById(1L)).thenReturn(record);
+        when(readerMapper.selectById(READER_ID)).thenReturn(reader("ACTIVE", 5));
         when(readerMapper.selectBatchIds(any())).thenReturn(List.of(reader("ACTIVE", 5)));
         when(bookMapper.selectBatchIds(any())).thenReturn(List.of(book("AVAILABLE", 3)));
 
@@ -181,6 +182,7 @@ class BorrowServiceImplTest {
     @Test
     void returnOnTimeHasZeroFine() {
         when(borrowRecordMapper.selectById(1L)).thenReturn(borrowed(LocalDate.now().plusDays(3), 0));
+        when(readerMapper.selectById(READER_ID)).thenReturn(reader("ACTIVE", 5));
         when(readerMapper.selectBatchIds(any())).thenReturn(List.of(reader("ACTIVE", 5)));
         when(bookMapper.selectBatchIds(any())).thenReturn(List.of(book("AVAILABLE", 3)));
 
@@ -204,8 +206,23 @@ class BorrowServiceImplTest {
     }
 
     @Test
+    void returnRejectsSuspendedReader() {
+        when(borrowRecordMapper.selectById(1L)).thenReturn(borrowed(LocalDate.now().plusDays(5), 0));
+        when(readerMapper.selectById(READER_ID)).thenReturn(reader("SUSPENDED", 5));
+
+        assertThatThrownBy(() -> borrowService.returnBook(1L))
+                .isInstanceOfSatisfying(BizException.class, ex -> {
+                    assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.READER_INACTIVE);
+                    assertThat(ex.getMessage()).contains("停用");
+                });
+        verify(borrowRecordMapper, never()).updateById(any(BorrowRecord.class));
+        verify(bookMapper, never()).increaseAvailableStock(any());
+    }
+
+    @Test
     void renewExtendsDueDateAndCountsTimes() {
         when(borrowRecordMapper.selectById(1L)).thenReturn(borrowed(LocalDate.now().plusDays(5), 1));
+        when(readerMapper.selectById(READER_ID)).thenReturn(reader("ACTIVE", 5));
         when(readerMapper.selectBatchIds(any())).thenReturn(List.of(reader("ACTIVE", 5)));
         when(bookMapper.selectBatchIds(any())).thenReturn(List.of(book("AVAILABLE", 3)));
 
@@ -219,6 +236,7 @@ class BorrowServiceImplTest {
     @Test
     void renewRejectsOverdueRecord() {
         when(borrowRecordMapper.selectById(1L)).thenReturn(borrowed(LocalDate.now().minusDays(1), 0));
+        when(readerMapper.selectById(READER_ID)).thenReturn(reader("ACTIVE", 5));
 
         assertThatThrownBy(() -> borrowService.renew(1L))
                 .isInstanceOfSatisfying(BizException.class,
@@ -229,6 +247,7 @@ class BorrowServiceImplTest {
     @Test
     void renewRejectsWhenRenewLimitReached() {
         when(borrowRecordMapper.selectById(1L)).thenReturn(borrowed(LocalDate.now().plusDays(5), 2));
+        when(readerMapper.selectById(READER_ID)).thenReturn(reader("ACTIVE", 5));
 
         assertThatThrownBy(() -> borrowService.renew(1L))
                 .isInstanceOfSatisfying(BizException.class,
@@ -244,6 +263,19 @@ class BorrowServiceImplTest {
         assertThatThrownBy(() -> borrowService.renew(1L))
                 .isInstanceOfSatisfying(BizException.class,
                         ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.CONFLICT));
+    }
+
+    @Test
+    void renewRejectsSuspendedReader() {
+        when(borrowRecordMapper.selectById(1L)).thenReturn(borrowed(LocalDate.now().plusDays(5), 0));
+        when(readerMapper.selectById(READER_ID)).thenReturn(reader("SUSPENDED", 5));
+
+        assertThatThrownBy(() -> borrowService.renew(1L))
+                .isInstanceOfSatisfying(BizException.class, ex -> {
+                    assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.READER_INACTIVE);
+                    assertThat(ex.getMessage()).contains("停用");
+                });
+        verify(borrowRecordMapper, never()).updateById(any(BorrowRecord.class));
     }
 
     @Test
