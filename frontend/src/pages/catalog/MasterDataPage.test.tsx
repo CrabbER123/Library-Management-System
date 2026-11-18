@@ -80,14 +80,14 @@ describe('MasterDataPage', () => {
     expect(await screen.findByText('—')).toBeInTheDocument();
   });
 
-  it('按 defaultSort 传入默认排序（分类页要求按编码倒序）', async () => {
+  it('按 defaultSort 传入默认排序（分类页要求按编码升序）', async () => {
     render(
       <MasterDataPage
         resource="categories"
         title="分类"
         description="单层分类"
         keywordPlaceholder="名称 / 编码"
-        defaultSort="code,desc"
+        defaultSort="code,asc"
         columns={[
           { key: 'name', title: '名称' },
           { key: 'code', title: '编码' },
@@ -101,7 +101,7 @@ describe('MasterDataPage', () => {
         page: 1,
         size: 10,
         keyword: undefined,
-        sort: 'code,desc',
+        sort: 'code,asc',
       }),
     );
   });

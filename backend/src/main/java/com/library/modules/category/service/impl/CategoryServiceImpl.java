@@ -45,8 +45,8 @@ public class CategoryServiceImpl implements CategoryService {
             wrapper.and(w -> w.like("name", kw).or().like("code", kw).or().like("description", kw));
         }
         if (Sorts.apply(wrapper, sort, SORT_COLUMNS) == null) {
-            // 分类默认按编码倒序：编码是人工维护的业务序号，倒序更贴近“新建在前”的使用习惯
-            Sorts.applyDefault(wrapper, "code", false);
+            // 分类默认按编码升序：编码是人工维护的业务序号（如 A/B/C 或 CS/MA），升序即为词典顺序
+            Sorts.applyDefault(wrapper, "code", true);
         }
 
         Page<Category> result = categoryMapper.selectPage(new Page<>(safePage, safeSize), wrapper);

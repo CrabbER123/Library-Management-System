@@ -45,24 +45,24 @@ class CategoryServiceImplTest {
     }
 
     @Test
-    void listSortsByCodeDescendingByDefault() {
+    void listSortsByCodeAscendingByDefault() {
         String sql = captureListSql(null);
 
-        assertThat(normalized(sql)).contains("order by code desc");
+        assertThat(normalized(sql)).contains("order by code asc");
     }
 
     @Test
     void listKeepsExplicitAllowedSort() {
         String sql = captureListSql("name,asc");
 
-        assertThat(normalized(sql)).contains("order by name asc").doesNotContain("code desc");
+        assertThat(normalized(sql)).contains("order by name asc").doesNotContain("code asc");
     }
 
     @Test
     void listFallsBackToDefaultWhenSortFieldIsNotAllowed() {
         String sql = captureListSql("description desc; drop table books");
 
-        assertThat(normalized(sql)).contains("order by code desc");
+        assertThat(normalized(sql)).contains("order by code asc");
     }
 
     @Test
