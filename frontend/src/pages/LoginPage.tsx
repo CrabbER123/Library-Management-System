@@ -59,7 +59,7 @@ export default function LoginPage() {
         {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
         <Form<LoginForm> layout="vertical" onFinish={onFinish} requiredMark={false} autoComplete="on">
           <Form.Item name="username" label="用户名" rules={[{ required: true, message: '请输入用户名' }]}>
-            <Input prefix={<UserOutlined />} placeholder="admin / librarian / reader01" size="large" autoFocus />
+            <Input prefix={<UserOutlined />} placeholder="请输入用户名" size="large" autoFocus />
           </Form.Item>
           <Form.Item name="password" label="密码" rules={[{ required: true, message: '请输入密码' }]}>
             <Input.Password prefix={<LockOutlined />} placeholder="请输入密码" size="large" />
@@ -69,7 +69,7 @@ export default function LoginPage() {
           </Button>
         </Form>
         <Typography.Paragraph type="secondary" style={{ marginTop: 20, marginBottom: 0, fontSize: 12 }}>
-          初始账号：管理员 admin / Admin@123456 · 馆员 librarian / Lib@123456 · 读者 reader01 / Reader@123456
+          初始账号：管理员 admin / Admin@123456（首次登录后请及时修改密码）
         </Typography.Paragraph>
       </Card>
     </div>

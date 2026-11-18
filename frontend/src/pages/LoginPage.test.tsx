@@ -46,7 +46,7 @@ describe('LoginPage', () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.type(screen.getByPlaceholderText(/admin \/ librarian/), '  admin  ');
+    await user.type(screen.getByPlaceholderText('请输入用户名'), '  admin  ');
     await user.type(screen.getByPlaceholderText('请输入密码'), 'Admin@123456');
     await user.click(screen.getByRole('button', { name: /登\s*录/ }));
 
@@ -59,10 +59,18 @@ describe('LoginPage', () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.type(screen.getByPlaceholderText(/admin \/ librarian/), 'admin');
+    await user.type(screen.getByPlaceholderText('请输入用户名'), 'admin');
     await user.type(screen.getByPlaceholderText('请输入密码'), 'wrong-password');
     await user.click(screen.getByRole('button', { name: /登\s*录/ }));
 
     expect(await screen.findByText('用户名或密码错误')).toBeInTheDocument();
+  });
+
+  it('只提示内置管理员账号，不再展示演示账号', () => {
+    renderPage();
+
+    expect(screen.getByText(/初始账号：管理员 admin/)).toBeInTheDocument();
+    expect(screen.queryByText(/librarian/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/reader01/)).not.toBeInTheDocument();
   });
 });

@@ -4,7 +4,7 @@
 
 - 当前进度：**阶段 0–7 全部完成**（MVP 交付）
 - 后端 62 个单元测试、前端 11 个组件测试全部通过
-- 数据库结构由 Flyway 管理（V1 建表 → V2 账号种子 → V3 图书种子 → V4 演示借阅数据）
+- 数据库结构由 Flyway 管理（V1 建表 → V2 角色字典与管理员账号；业务数据不预置）
 
 ## 目录
 
@@ -120,7 +120,7 @@
 │       │       └── config/           # 只读配置（借阅规则）
 │       ├── main/resources/
 │       │   ├── application.yml / -dev.yml / -prod.yml / -docker.yml
-│       │   └── db/migration/         # V1 建表、V2 账号、V3 图书、V4 演示借阅
+│       │   └── db/migration/         # V1 建表、V2 角色字典与管理员账号
 │       └── test/java/com/library/    # 单元测试（Mockito）+ 集成测试（Testcontainers）
 ├── frontend/
 │   ├── Dockerfile                    # 多阶段构建（Node → Nginx）
@@ -189,7 +189,7 @@ GRANT ALL PRIVILEGES ON library.* TO 'library'@'%';
 FLUSH PRIVILEGES;
 ```
 
-2）启动后端（Flyway 自动建表并写入种子数据）：
+2）启动后端（Flyway 自动建表并写入管理员账号）：
 
 ```bash
 cd backend
@@ -208,13 +208,15 @@ pnpm dev
 
 ## 默认账号
 
-| 账号 | 密码 | 角色 | 可见菜单 |
-| --- | --- | --- | --- |
-| `admin` | `Admin@123456` | 管理员 | 全部，含"用户与角色" |
-| `librarian` | `Lib@123456` | 馆员 | 图书、借阅、读者、基础数据、统计 |
-| `reader01` | `Reader@123456` | 读者 | 图书查询、我的借阅（档案 R2024001） |
+| 账号 | 密码 | 角色 |
+| --- | --- | --- |
+| `admin` | `Admin@123456` | 管理员 |
 
-种子数据还包含 8 本图书（红楼梦、三体、深入理解计算机系统、重构、人类简史、百年孤独、算法导论、围城）、8 位作者、6 家出版社、6 个分类，以及 3 位读者（张三/李四/王五）和若干条演示借阅记录（含逾期）。
+初始数据只包含这个管理员账号和三个角色字典（ADMIN / LIBRARIAN / READER）。**图书、作者、出版社、分类、读者与借阅记录全部为空**，需要由管理员在系统中手工录入：
+
+- 馆员账号：管理员登录 → 用户与角色 → 新增用户时选择 `LIBRARIAN`；
+- 读者账号：管理员登录 → 读者管理 → 新增读者并绑定账号（或由读者自助注册，见下）；
+- 图书：先建作者/出版社/分类，再在图书页新增图书并录入库存。
 
 > **上线前务必**修改默认密码、`JWT_SECRET` 与数据库密码。
 
@@ -287,7 +289,7 @@ pnpm dev
 # 登录
 curl -s -X POST http://localhost:8080/api/v1/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"username":"librarian","password":"Lib@123456"}'
+  -d '{"username":"admin","password":"Admin@123456"}'
 
 # 图书检索（关键字同时匹配书名、副标题、ISBN、作者名）
 curl -s "http://localhost:8080/api/v1/books?keyword=%E4%B8%89%E4%BD%93&page=1&size=10&sort=title,asc" \

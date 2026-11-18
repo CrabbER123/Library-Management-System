@@ -25,6 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * 关键接口集成测试：真实 MySQL + Flyway 迁移 + 种子数据。
+ * 种子数据只包含角色字典与管理员账号，业务数据全部由测试用例现场创建。
  * 需要 Docker 环境，执行：mvn -Pit verify
  */
 @Tag("integration")
@@ -83,8 +84,30 @@ class AuthIntegrationTest {
     }
 
     @Test
-    void readerCanNotAccessUserManagement() throws Exception {
-        String token = login("reader01", "Reader@123456");
+    void demoDataIsNotSeeded() throws Exception {
+        String token = login("admin", "Admin@123456");
+
+        // 全新库只有管理员账号和角色字典，业务数据为空
+        mockMvc.perform(get("/api/v1/books").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(0));
+        mockMvc.perform(get("/api/v1/readers").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(0));
+        mockMvc.perform(get("/api/v1/authors").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(0));
+        mockMvc.perform(get("/api/v1/users").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1));
+    }
+
+    @Test
+    void librarianCanNotAccessUserManagement() throws Exception {
+        String adminToken = login("admin", "Admin@123456");
+        createUser(adminToken, "librarian_test", "Lib@123456", "LIBRARIAN");
+
+        String token = login("librarian_test", "Lib@123456");
 
         mockMvc.perform(get("/api/v1/users").header("Authorization", "Bearer " + token))
                 .andExpect(status().isForbidden())
@@ -95,7 +118,7 @@ class AuthIntegrationTest {
     void refreshTokenIsRotated() throws Exception {
         String loginBody = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\"reader01\",\"password\":\"Reader@123456\"}"))
+                        .content("{\"username\":\"admin\",\"password\":\"Admin@123456\"}"))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
         String refreshToken = read(loginBody).path("data").path("refreshToken").asText();
@@ -116,6 +139,15 @@ class AuthIntegrationTest {
                         .content("{\"refreshToken\":\"" + refreshToken + "\"}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(40102));
+    }
+
+    private void createUser(String adminToken, String username, String password, String role) throws Exception {
+        mockMvc.perform(post("/api/v1/users")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"" + username + "\",\"password\":\"" + password
+                                + "\",\"displayName\":\"测试账号\",\"roles\":[\"" + role + "\"]}"))
+                .andExpect(status().isCreated());
     }
 
     private String login(String username, String password) throws Exception {

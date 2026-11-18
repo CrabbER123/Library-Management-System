@@ -71,7 +71,7 @@ Swagger 是接口契约的"唯一事实来源"，本文件只做导航与示例�
 ```bash
 TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"username":"librarian","password":"Lib@123456"}' | jq -r '.data.accessToken')
+  -d '{"username":"admin","password":"Admin@123456"}' | jq -r '.data.accessToken')
 ```
 
 图书检索（关键字同时匹配书名、副标题、ISBN、作者名，支持分页与排序白名单）：

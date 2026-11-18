@@ -196,4 +196,4 @@ UNIQUE KEY uk_active_borrow (reader_id, book_id, active_flag)
 ### 7. 时间与中文
 
 - 全部日期用 `DATE`（借期按自然日计算），时间戳用 `DATETIME`；JDBC 时区固定 `Asia/Shanghai`，Jackson 输出 `yyyy-MM-dd HH:mm:ss`。
-- 库、表、连接均为 `utf8mb4`，种子数据中的中文在冒烟测试里已做十六进制校验。
+- 库、表、连接均为 `utf8mb4`；初始数据只有角色字典与管理员账号，中文内容由用户录入，冒烟测试已验证中文读写与排序正常。

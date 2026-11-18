@@ -45,26 +45,31 @@ cd frontend && pnpm dev
 
 - [ ] `GET http://localhost:8080/actuator/health` 返回 `{"status":"UP"}`
 - [ ] `http://localhost:8080/swagger-ui.html` 可打开并列出全部分组
-- [ ] Flyway 日志显示 V1~V4 全部 `Success`，`flyway_schema_history` 4 条记录
+- [ ] Flyway 日志显示 V1/V2 全部 `Success`，`flyway_schema_history` 2 条记录
 - [ ] `http://localhost:5173` 打开登录页，`/api` 代理到后端（登录成功）
+- [ ] 首次启动后数据库只有 1 个账号（admin），图书/作者/出版社/分类/读者/借阅全为空
 
 ## 4. 账号与权限
 
-| 账号 | 密码 | 预期 |
-| --- | --- | --- |
-| `admin` | `Admin@123456` | 可见"用户与角色"菜单，可增删改用户 |
-| `librarian` | `Lib@123456` | 可见借阅/读者/基础数据/统计，看不到用户管理 |
-| `reader01` | `Reader@123456` | 只有"图书查询"和"我的借阅"，访问 `/users` 返回 403 |
+初始只有管理员账号，馆员与读者需要手工创建：
+
+| 账号 | 密码 | 创建方式 | 预期 |
+| --- | --- | --- | --- |
+| `admin` | `Admin@123456` | 迁移脚本内置 | 可见"用户与角色"菜单，可增删改用户 |
+| `librarian` | `Lib@123456` | 管理员在"用户与角色"新增，角色选 `LIBRARIAN` | 可见借阅/读者/基础数据/统计，看不到用户管理 |
+| `reader` | `Reader@123456` | 管理员新增读者并绑定该账号（或读者自助注册） | 只有"图书查询"和"我的借阅"，访问 `/users` 返回 403 |
 
 - [ ] 登录成功返回 `accessToken` / `refreshToken`，`expiresIn=1800`
-- [ ] 直接访问 `http://localhost:5173/users`（reader01）显示 403 页面
+- [ ] 直接访问 `http://localhost:5173/users`（读者账号）显示 403 页面
 - [ ] 刷新令牌后旧 refresh token 再用返回 `40102`
 - [ ] 停用某账号后该账号无法登录
 
 ## 5. 图书与主数据
 
-- [ ] 图书列表分页：`GET /api/v1/books?page=1&size=10` 返回 8 条种子数据
-- [ ] 关键字搜索"刘慈欣"能搜到《三体》（作者名子查询生效）
+先手工录入基础数据：至少 1 个分类、1 家出版社、2 位作者，再新增 2 本图书（含库存）。
+
+- [ ] 初始图书列表为空（`total=0`），新增后分页正常
+- [ ] 关键字搜索作者名能命中对应图书（作者名子查询生效）
 - [ ] 新增图书时 ISBN 带连字符可保存，入库为 13 位纯数字
 - [ ] 重复 ISBN 返回 `409/40901`，非法 ISBN 返回 `422/42200`
 - [ ] 总库存不能小于已借出数（返回 `422`）
@@ -73,10 +78,10 @@ cd frontend && pnpm dev
 
 ## 6. 读者
 
-- [ ] 读者列表含张三（R2024001）、李四（R2024002）、王五（R2024003）
+- [ ] 初始读者列表为空，新增读者后列表出现该记录
 - [ ] 借阅证号重复返回 `409/40901`
 - [ ] 一个登录账号不能被绑定到两个读者档案
-- [ ] `GET /readers/me`（reader01）返回 `cardNo=R2024001`、`maxBorrow=5`、`borrowingCount`
+- [ ] 读者账号 `GET /readers/me` 返回本人 `cardNo`、`maxBorrow`、`borrowingCount`
 
 ## 7. 借书 / 还书 / 续借
 
@@ -94,7 +99,7 @@ cd frontend && pnpm dev
 ## 8. 统计
 
 - [ ] `GET /stats/overview` 返回图书种类/册数/可借/借出/逾期/读者等 8 项指标，且与数据库一致
-- [ ] `GET /stats/popular-books?limit=5` 按借阅次数倒序，首条为《三体》
+- [ ] `GET /stats/popular-books?limit=5` 按借阅次数倒序，次数最多的图书排在首位
 - [ ] `GET /stats/category-distribution` 覆盖全部分类（含 0 本的分类）
 - [ ] `limit` 超出 1~50 返回 `422/42200`
 - [ ] 前端"统计概览"页 4 张卡片、排行榜、分类分布渲染正常
@@ -119,7 +124,7 @@ docker compose ps
 ```
 
 - [ ] 三个容器 `library-mysql` / `library-backend` / `library-frontend` 均为 healthy/running
-- [ ] `docker compose logs backend | grep Flyway` 显示 V1~V4 执行成功
+- [ ] `docker compose logs backend | grep Flyway` 显示 V1/V2 执行成功
 - [ ] `http://localhost` 可登录，`http://localhost:8080/swagger-ui.html` 可访问
 - [ ] 重启容器后数据仍在（`mysql-data` 卷持久化）
 - [ ] `docker compose down` 停止；`docker compose down -v` 清空数据
