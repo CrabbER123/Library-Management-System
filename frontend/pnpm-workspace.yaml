@@ -1,0 +1,8 @@
+# pnpm 11 从 pnpm-workspace.yaml 读取构建脚本白名单，不再读取 package.json 的 pnpm 字段。
+# esbuild 的可执行文件由 @esbuild/win32-x64 可选依赖直接提供，无需执行其 postinstall 脚本，
+# 因此显式声明为忽略，避免 [ERR_PNPM_IGNORED_BUILDS] 阻断 pnpm run。
+ignoredBuiltDependencies:
+  - esbuild
+
+# 本仓库前端不作为 workspace 根被再次安装，运行脚本前不做依赖一致性校验。
+verifyDepsBeforeRun: false
