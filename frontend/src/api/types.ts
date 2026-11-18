@@ -88,8 +88,10 @@ export interface BookPayload {
   isbn: string;
   title: string;
   subtitle?: string | null;
-  authorIds: number[];
-  publisherId?: number | null;
+  /** 作者姓名（自由输入，服务端按名称复用或自动建档） */
+  authorNames: string[];
+  /** 出版社名称（自由输入，不存在时自动创建） */
+  publisherName?: string | null;
   categoryId?: number | null;
   publishDate?: string | null;
   language?: string | null;

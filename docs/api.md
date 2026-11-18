@@ -82,6 +82,16 @@ curl -s -X POST http://localhost:8080/api/v1/auth/register \
   -d '{"username":"newbie","password":"Reader@123456","displayName":"王小明","phone":"13800000000"}'
 ```
 
+新增图书（`authorNames` / `publisherName` 为自由文本，不存在时自动创建；也可改用 `authorIds` / `publisherId`）：
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/books \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"isbn":"978-7-5366-9293-0","title":"三体","authorNames":["刘慈欣"],"publisherName":"重庆出版社","categoryId":1,"totalStock":5,"price":23.00}'
+```
+
+说明：`authorNames` 最多 20 个、单个不超过 100 字符；`publisherName` 不超过 100 字符；至少提供一位作者，否则返回 `422/42200`。
+
 图书检索（关键字同时匹配书名、副标题、ISBN、作者名，支持分页与排序白名单）：
 
 ```bash

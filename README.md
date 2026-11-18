@@ -3,7 +3,7 @@
 一个可直接运行、分层清晰、带测试与文档的图书管理系统，覆盖**账号与 RBAC 权限、图书与主数据、读者、借还续、逾期罚款、统计报表**，并提供 React 管理端与 Docker Compose 一键部署。
 
 - 当前进度：**阶段 0–7 全部完成**（MVP 交付）
-- 后端 65 个单元测试、前端 16 个组件测试全部通过
+- 后端 68 个单元测试、前端 18 个组件测试全部通过
 - 数据库结构由 Flyway 管理（V1 建表 → V2 角色字典与管理员账号；业务数据不预置）
 
 ## 目录
@@ -262,7 +262,8 @@ pnpm dev
 4. **重复在借**：`borrow_records` 的生成列 `active_flag`（BORROWED=1，否则 NULL）+ `UNIQUE(reader_id, book_id, active_flag)`，应用层提示 + 数据库兜底。
 5. **库存调整**：`total_stock` 不得低于"已借出数量"（`total - available`），调整后按此重算 `available_stock`。
 6. **删除保护**：有借阅记录的图书/读者不可删除（提示改为下架/停用）；被图书引用的作者/出版社/分类不可删除。
-7. **权限**：写操作仅 ADMIN/LIBRARIAN；读者只能读图书、自己的借阅与档案；用户与角色管理仅 ADMIN；不能删除/停用自己，不能移除最后一个管理员。
+7. **作者与出版社自由录入**：新增/编辑图书时直接输入作者姓名与出版社名称（不再要求先建主数据）。服务端按名称精确匹配，已存在则复用、不存在则自动建档；`authors.name`、`publishers.name` 上的唯一约束保证不会重复。也可继续用 `authorIds` / `publisherId` 提交已存在的 ID。
+8. **权限**：写操作仅 ADMIN/LIBRARIAN；读者只能读图书、自己的借阅与档案；用户与角色管理仅 ADMIN；不能删除/停用自己，不能移除最后一个管理员。
 
 更多细节见 [docs/er-diagram.md](docs/er-diagram.md)。
 
@@ -278,7 +279,7 @@ pnpm dev
 | 用户 | `GET/POST /users`、`GET/PUT/DELETE /users/{id}`、`PATCH /users/{id}/status`、`PUT /users/{id}/roles` | ADMIN | 用户与角色管理 |
 | 角色 | `GET /roles` | ADMIN | 角色字典 |
 | 图书 | `GET /books`、`GET /books/{id}` | 登录 | 分页搜索：`keyword`、`categoryId`、`authorId`、`publisherId`、`status`、`sort` |
-| 图书 | `POST/PUT/DELETE /books`、`PATCH /books/{id}/status`、`PUT /books/{id}/stock` | ADMIN/LIBRARIAN | 新增/编辑/删除、上下架、调整库存 |
+| 图书 | `POST/PUT/DELETE /books`、`PATCH /books/{id}/status`、`PUT /books/{id}/stock` | ADMIN/LIBRARIAN | 新增/编辑/删除、上下架、调整库存；作者与出版社按名称提交（`authorNames`、`publisherName`），不存在时自动创建 |
 | 作者 | `/authors` 全套 | 登录 / ADMIN+LIBRARIAN | 查询 / 维护 |
 | 出版社 | `/publishers` 全套 | 登录 / ADMIN+LIBRARIAN | 查询 / 维护 |
 | 分类 | `/categories` 全套 | 登录 / ADMIN+LIBRARIAN | 查询 / 维护 |
@@ -298,6 +299,11 @@ curl -s -X POST http://localhost:8080/api/v1/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"Admin@123456"}'
 
+# 新增图书：作者与出版社直接填名字，不存在会自动建档
+curl -s -X POST http://localhost:8080/api/v1/books \
+  -H "Authorization: Bearer <accessToken>" -H 'Content-Type: application/json' \
+  -d '{"isbn":"9787536692930","title":"三体","authorNames":["刘慈欣"],"publisherName":"重庆出版社","totalStock":5}'
+
 # 图书检索（关键字同时匹配书名、副标题、ISBN、作者名）
 curl -s "http://localhost:8080/api/v1/books?keyword=%E4%B8%89%E4%BD%93&page=1&size=10&sort=title,asc" \
   -H "Authorization: Bearer <accessToken>"
@@ -315,7 +321,7 @@ curl -s http://localhost:8080/api/v1/stats/overview -H "Authorization: Bearer <a
 
 ## 测试
 
-后端（65 例单元测试，纯 Mockito，不需要数据库）：
+后端（68 例单元测试，纯 Mockito，不需要数据库）：
 
 ```bash
 cd backend
@@ -335,7 +341,7 @@ mvn -Pit verify
 
 ```bash
 cd frontend
-pnpm test        # Vitest + Testing Library，16 例
+pnpm test        # Vitest + Testing Library，18 例
 pnpm build       # tsc --noEmit + vite build
 ```
 

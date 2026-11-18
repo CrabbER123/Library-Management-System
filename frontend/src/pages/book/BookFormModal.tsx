@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { DatePicker, Form, Input, InputNumber, Modal, Select, message } from 'antd';
+import { AutoComplete, DatePicker, Form, Input, InputNumber, Modal, Select, message } from 'antd';
 import dayjs from 'dayjs';
 import { bookApi, namedApi } from '../../api';
 import { errorMessage } from '../../api/http';
@@ -16,8 +16,8 @@ interface FormValues {
   title: string;
   subtitle?: string;
   isbn: string;
-  authorIds: number[];
-  publisherId?: number;
+  authorNames: string[];
+  publisherName?: string;
   categoryId?: number;
   publishDate?: dayjs.Dayjs | null;
   language?: string;
@@ -57,8 +57,8 @@ export default function BookFormModal({ open, record, onCancel, onSaved }: Props
         title: record.title,
         subtitle: record.subtitle ?? undefined,
         isbn: record.isbn,
-        authorIds: record.authors.map((author) => author.id),
-        publisherId: record.publisherId ?? undefined,
+        authorNames: record.authors.map((author) => author.name),
+        publisherName: record.publisherName ?? undefined,
         categoryId: record.categoryId ?? undefined,
         publishDate: record.publishDate ? dayjs(record.publishDate) : null,
         language: record.language ?? undefined,
@@ -75,13 +75,19 @@ export default function BookFormModal({ open, record, onCancel, onSaved }: Props
   }, [open, record, form]);
 
   const submit = async () => {
-    const values = await form.validateFields();
+    let values: FormValues;
+    try {
+      values = await form.validateFields();
+    } catch {
+      // 校验失败时 antd 已在表单内展示错误信息，无需额外处理
+      return;
+    }
     const payload: BookPayload = {
       title: values.title.trim(),
       subtitle: values.subtitle?.trim() || null,
       isbn: values.isbn.trim(),
-      authorIds: values.authorIds,
-      publisherId: values.publisherId ?? null,
+      authorNames: values.authorNames.map((name) => name.trim()).filter((name) => name.length > 0),
+      publisherName: values.publisherName?.trim() || null,
       categoryId: values.categoryId ?? null,
       publishDate: values.publishDate ? values.publishDate.format('YYYY-MM-DD') : null,
       language: values.language?.trim() || null,
@@ -139,22 +145,29 @@ export default function BookFormModal({ open, record, onCancel, onSaved }: Props
           >
             <Input placeholder="9787536692930" maxLength={20} />
           </Form.Item>
-          <Form.Item name="authorIds" label="作者" rules={[{ required: true, message: '请至少选择一位作者' }]}>
+          <Form.Item
+            name="authorNames"
+            label="作者"
+            extra="直接输入姓名，回车确认；多个作者可输入多个。已存在的作者会自动复用，新名字会自动建档。"
+            rules={[{ required: true, message: '请至少填写一位作者' }]}
+          >
             <Select
-              mode="multiple"
-              showSearch
-              optionFilterProp="label"
-              placeholder="选择作者（可多选）"
-              options={authors.map((author) => ({ value: author.id, label: author.name }))}
+              mode="tags"
+              tokenSeparators={[',', '，']}
+              placeholder="输入作者姓名后回车，例如：刘慈欣"
+              options={authors.map((author) => ({ value: author.name, label: author.name }))}
             />
           </Form.Item>
-          <Form.Item name="publisherId" label="出版社">
-            <Select
+          <Form.Item
+            name="publisherName"
+            label="出版社"
+            extra="直接输入名称；不存在时会自动创建。"
+          >
+            <AutoComplete
               allowClear
-              showSearch
-              optionFilterProp="label"
-              placeholder="选择出版社"
-              options={publishers.map((item) => ({ value: item.id, label: item.name }))}
+              placeholder="输入出版社名称，例如：人民文学出版社"
+              options={publishers.map((item) => ({ value: item.name }))}
+              filterOption={(input, option) => (option?.value ?? '').includes(input)}
             />
           </Form.Item>
           <Form.Item name="categoryId" label="分类">
