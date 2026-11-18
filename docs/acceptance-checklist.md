@@ -16,8 +16,8 @@ cd backend
 mvn test
 ```
 
-- [ ] 输出 `Tests run: 62, Failures: 0, Errors: 0`
-- [ ] 覆盖：JWT 生成/解析/过期/篡改、登录与刷新轮换、用户与角色、图书（ISBN 规范化/库存重算/删除校验）、读者、作者、借还续与逾期罚款、统计聚合
+- [ ] 输出 `Tests run: 65, Failures: 0, Errors: 0`
+- [ ] 覆盖：JWT 生成/解析/过期/篡改、登录与刷新轮换、读者自助注册（证号生成/重复用户名/密码加密）、用户与角色、图书（ISBN 规范化/库存重算/删除校验）、读者、作者、借还续与逾期罚款、统计聚合
 
 ## 2. 前端组件测试与构建
 
@@ -27,7 +27,7 @@ pnpm test
 pnpm build
 ```
 
-- [ ] `Test Files 3 passed`，`Tests 11 passed`
+- [ ] `Test Files 4 passed`，`Tests 16 passed`
 - [ ] `tsc --noEmit` 无类型错误，`vite build` 产出 `dist/`（含 react/antd 独立 chunk）
 
 ## 3. 本地联调启动
@@ -60,6 +60,9 @@ cd frontend && pnpm dev
 | `reader` | `Reader@123456` | 管理员新增读者并绑定该账号（或读者自助注册） | 只有"图书查询"和"我的借阅"，访问 `/users` 返回 403 |
 
 - [ ] 登录成功返回 `accessToken` / `refreshToken`，`expiresIn=1800`
+- [ ] 登录页「立即注册」可自助注册读者：提交后自动登录并跳转「我的借阅」
+- [ ] 自助注册的读者自动获得借阅证（证号形如 `R000005`），`GET /readers/me` 有数据
+- [ ] 重复用户名注册返回 `409/40901`，非法用户名/密码返回 `422/42200`
 - [ ] 直接访问 `http://localhost:5173/users`（读者账号）显示 403 页面
 - [ ] 刷新令牌后旧 refresh token 再用返回 `40102`
 - [ ] 停用某账号后该账号无法登录

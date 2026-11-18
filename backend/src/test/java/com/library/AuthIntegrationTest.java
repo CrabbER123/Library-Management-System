@@ -68,6 +68,51 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void readerCanSelfRegisterAndReadOwnProfile() throws Exception {
+        String body = mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"selfreader\",\"password\":\"Reader@123456\","
+                                + "\"displayName\":\"自助注册读者\",\"phone\":\"13900001111\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.data.user.roles[0]").value("READER"))
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+
+        String token = read(body).path("data").path("accessToken").asText();
+
+        // 注册即开通借阅证，读者能读取自己的档案
+        mockMvc.perform(get("/api/v1/readers/me").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.name").value("自助注册读者"))
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.maxBorrow").value(5))
+                .andExpect(jsonPath("$.data.cardNo").value(org.hamcrest.Matchers.startsWith("R")));
+
+        // 自助注册的账号只有 READER 权限
+        mockMvc.perform(get("/api/v1/users").header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(40300));
+
+        // 重复用户名注册被拒绝
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"selfreader\",\"password\":\"Reader@123456\","
+                                + "\"displayName\":\"重复账号\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(40901));
+    }
+
+    @Test
+    void registerValidatesInput() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"a\",\"password\":\"123\",\"displayName\":\"\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value(42200));
+    }
+
+    @Test
     void anonymousRequestIsRejected() throws Exception {
         mockMvc.perform(get("/api/v1/users"))
                 .andExpect(status().isUnauthorized())

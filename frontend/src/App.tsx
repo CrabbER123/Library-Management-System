@@ -4,6 +4,7 @@ import AppLayout from './components/AppLayout';
 import { RequireAuth, RequireRole } from './components/RequireAuth';
 import LoginPage from './pages/LoginPage';
 import NotFoundPage from './pages/NotFoundPage';
+import RegisterPage from './pages/RegisterPage';
 import BooksPage from './pages/book/BooksPage';
 import MyBorrowsPage from './pages/borrow/MyBorrowsPage';
 import BorrowsPage from './pages/borrow/BorrowsPage';
@@ -25,6 +26,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>
           <Route index element={<HomeRedirect />} />

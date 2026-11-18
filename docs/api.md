@@ -50,7 +50,7 @@ Swagger 是接口契约的"唯一事实来源"，本文件只做导航与示例�
 
 | 模块 | 路径 | 匿名 | 读者 | 馆员 | 管理员 |
 | --- | --- | :-: | :-: | :-: | :-: |
-| 认证 | `/auth/login`、`/auth/refresh` | ✅ | | | |
+| 认证 | `/auth/login`、`/auth/refresh`、`/auth/register` | ✅ | | | |
 | 认证 | `/auth/logout`、`/auth/me` | | ✅ | ✅ | ✅ |
 | 图书 | `GET /books`、`GET /books/{id}` | | ✅ | ✅ | ✅ |
 | 图书 | `POST/PUT/DELETE /books`、`PATCH /books/{id}/status`、`PUT /books/{id}/stock` | | | ✅ | ✅ |
@@ -74,10 +74,18 @@ TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/login \
   -d '{"username":"admin","password":"Admin@123456"}' | jq -r '.data.accessToken')
 ```
 
+读者自助注册（成功返回 201 与令牌，可直接进入系统）：
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"newbie","password":"Reader@123456","displayName":"王小明","phone":"13800000000"}'
+```
+
 图书检索（关键字同时匹配书名、副标题、ISBN、作者名，支持分页与排序白名单）：
 
 ```bash
-curl -s "http://localhost:8080/api/v1/books?keyword=%E4%B8%89%E4%BD%93&categoryId=1&status=AVAILABLE&page=1&size=10&sort=title,asc" \
+curl -s "http://localhost:8080/api/v1/books?keyword=java&categoryId=1&status=AVAILABLE&page=1&size=10&sort=title,asc" \
   -H "Authorization: Bearer $TOKEN"
 ```
 

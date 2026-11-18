@@ -2,8 +2,10 @@ package com.library.modules.auth.service.impl;
 
 import com.library.common.exception.BizException;
 import com.library.common.exception.ErrorCode;
+import com.library.config.BorrowProperties;
 import com.library.modules.auth.dto.CurrentUserVO;
 import com.library.modules.auth.dto.LoginRequest;
+import com.library.modules.auth.dto.RegisterRequest;
 import com.library.modules.auth.dto.TokenResponse;
 import com.library.modules.auth.entity.RefreshToken;
 import com.library.modules.auth.mapper.RefreshTokenMapper;
@@ -19,6 +21,7 @@ import com.library.support.MpTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -32,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -59,7 +63,90 @@ class AuthServiceImplTest {
         passwordEncoder = new BCryptPasswordEncoder(4);
         jwtTokenProvider = new JwtTokenProvider(new JwtProperties(SECRET, Duration.ofMinutes(30), Duration.ofDays(7)));
         authService = new AuthServiceImpl(userMapper, refreshTokenMapper, readerMapper,
-                roleAssignmentService, passwordEncoder, jwtTokenProvider);
+                roleAssignmentService, passwordEncoder, jwtTokenProvider,
+                new BorrowProperties(30, 2, 15, 5, new java.math.BigDecimal("0.50"), false,
+                        new java.math.BigDecimal("100.00")));
+    }
+
+    @Test
+    void registerCreatesReaderProfileAndReturnsTokens() {
+        java.util.concurrent.atomic.AtomicReference<String> insertedCardNo =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        when(userMapper.selectCount(any())).thenReturn(0L);
+        when(userMapper.insert(any(User.class))).thenAnswer(invocation -> {
+            User inserted = invocation.getArgument(0);
+            inserted.setId(10L);
+            return 1;
+        });
+        when(readerMapper.insert(any(Reader.class))).thenAnswer(invocation -> {
+            Reader inserted = invocation.getArgument(0);
+            insertedCardNo.set(inserted.getCardNo());
+            inserted.setId(7L);
+            return 1;
+        });
+        when(readerMapper.updateById(any(Reader.class))).thenReturn(1);
+        when(refreshTokenMapper.insert(any(RefreshToken.class))).thenReturn(1);
+
+        TokenResponse response = authService.register(
+                new RegisterRequest("  newbie  ", "secret123", "  王小明 ", "13800000000", " newbie@example.com "));
+
+        assertThat(response.accessToken()).isNotBlank();
+        assertThat(response.user().username()).isEqualTo("newbie");
+        assertThat(response.user().roles()).containsExactly("READER");
+        assertThat(response.user().status()).isEqualTo(UserStatus.ACTIVE);
+        verify(roleAssignmentService).replace(10L, List.of("READER"));
+
+        ArgumentCaptor<Reader> readerCaptor = ArgumentCaptor.forClass(Reader.class);
+        verify(readerMapper).insert(readerCaptor.capture());
+        Reader saved = readerCaptor.getValue();
+        assertThat(saved.getUserId()).isEqualTo(10L);
+        assertThat(saved.getName()).isEqualTo("王小明");
+        assertThat(saved.getStatus()).isEqualTo("ACTIVE");
+        assertThat(saved.getMaxBorrow()).isEqualTo(5);
+        // 插入时用占位证号，拿到主键后更新为 R + 6 位编号
+        assertThat(insertedCardNo.get()).isEqualTo("PENDING-10");
+        ArgumentCaptor<Reader> updateCaptor = ArgumentCaptor.forClass(Reader.class);
+        verify(readerMapper).updateById(updateCaptor.capture());
+        assertThat(updateCaptor.getValue().getCardNo()).isEqualTo("R000007");
+    }
+
+    @Test
+    void registerHashesPasswordAndPersistsOptionalFields() {
+        when(userMapper.selectCount(any())).thenReturn(0L);
+        when(userMapper.insert(any(User.class))).thenAnswer(invocation -> {
+            User inserted = invocation.getArgument(0);
+            inserted.setId(11L);
+            return 1;
+        });
+        when(readerMapper.insert(any(Reader.class))).thenAnswer(invocation -> {
+            Reader inserted = invocation.getArgument(0);
+            inserted.setId(8L);
+            return 1;
+        });
+        when(refreshTokenMapper.insert(any(RefreshToken.class))).thenReturn(1);
+
+        authService.register(new RegisterRequest("reader02", "secret123", "李雷", null, ""));
+
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        verify(userMapper).insert(userCaptor.capture());
+        User saved = userCaptor.getValue();
+        assertThat(saved.getPasswordHash()).isNotEqualTo("secret123");
+        assertThat(passwordEncoder.matches("secret123", saved.getPasswordHash())).isTrue();
+        assertThat(saved.getPhone()).isNull();
+        assertThat(saved.getEmail()).isNull();
+    }
+
+    @Test
+    void registerRejectsDuplicateUsername() {
+        when(userMapper.selectCount(any())).thenReturn(1L);
+
+        assertThatThrownBy(() -> authService.register(
+                new RegisterRequest("admin", "secret123", "冒名者", null, null)))
+                .isInstanceOfSatisfying(BizException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.DUPLICATE));
+
+        verify(userMapper, never()).insert(any(User.class));
+        verify(readerMapper, never()).insert(any(Reader.class));
     }
 
     @Test

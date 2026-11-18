@@ -3,7 +3,7 @@
 一个可直接运行、分层清晰、带测试与文档的图书管理系统，覆盖**账号与 RBAC 权限、图书与主数据、读者、借还续、逾期罚款、统计报表**，并提供 React 管理端与 Docker Compose 一键部署。
 
 - 当前进度：**阶段 0–7 全部完成**（MVP 交付）
-- 后端 62 个单元测试、前端 11 个组件测试全部通过
+- 后端 65 个单元测试、前端 16 个组件测试全部通过
 - 数据库结构由 Flyway 管理（V1 建表 → V2 角色字典与管理员账号；业务数据不预置）
 
 ## 目录
@@ -215,8 +215,14 @@ pnpm dev
 初始数据只包含这个管理员账号和三个角色字典（ADMIN / LIBRARIAN / READER）。**图书、作者、出版社、分类、读者与借阅记录全部为空**，需要由管理员在系统中手工录入：
 
 - 馆员账号：管理员登录 → 用户与角色 → 新增用户时选择 `LIBRARIAN`；
-- 读者账号：管理员登录 → 读者管理 → 新增读者并绑定账号（或由读者自助注册，见下）；
+- 读者账号：读者可在登录页点「立即注册」自助注册（自动创建 `READER` 账号 + 借阅证，并直接登录），也可由管理员登录 → 读者管理 → 新增读者并绑定账号；
 - 图书：先建作者/出版社/分类，再在图书页新增图书并录入库存。
+
+自助注册规则：
+
+- 用户名 3–32 位字母/数字/下划线，密码 6–64 位，姓名必填，手机号与邮箱选填；
+- 注册成功后自动开通借阅证，证号形如 `R000005`，初始借阅上限取 `library.borrow.max-borrow-per-reader`（默认 5）；
+- 馆员与管理员账号**不开放**注册，只能由管理员在「用户与角色」中创建。
 
 > **上线前务必**修改默认密码、`JWT_SECRET` 与数据库密码。
 
@@ -267,6 +273,7 @@ pnpm dev
 | 模块 | 方法与路径 | 权限 | 说明 |
 | --- | --- | --- | --- |
 | 认证 | `POST /auth/login`、`POST /auth/refresh` | 匿名 | 登录、刷新（旧 refresh token 立即失效） |
+| 认证 | `POST /auth/register` | 匿名 | 读者自助注册：创建 READER 账号 + 借阅证，直接返回令牌（馆员仍由管理员创建） |
 | 认证 | `POST /auth/logout`、`GET /auth/me` | 登录 | 注销、当前用户（含 `readerId`） |
 | 用户 | `GET/POST /users`、`GET/PUT/DELETE /users/{id}`、`PATCH /users/{id}/status`、`PUT /users/{id}/roles` | ADMIN | 用户与角色管理 |
 | 角色 | `GET /roles` | ADMIN | 角色字典 |
@@ -308,7 +315,7 @@ curl -s http://localhost:8080/api/v1/stats/overview -H "Authorization: Bearer <a
 
 ## 测试
 
-后端（62 例单元测试，纯 Mockito，不需要数据库）：
+后端（65 例单元测试，纯 Mockito，不需要数据库）：
 
 ```bash
 cd backend
@@ -328,7 +335,7 @@ mvn -Pit verify
 
 ```bash
 cd frontend
-pnpm test        # Vitest + Testing Library，11 例
+pnpm test        # Vitest + Testing Library，16 例
 pnpm build       # tsc --noEmit + vite build
 ```
 

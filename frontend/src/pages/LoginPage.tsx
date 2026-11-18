@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Alert, Button, Card, Form, Input, Typography, message } from 'antd';
 import { LockOutlined, UserOutlined } from '@ant-design/icons';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { errorMessage } from '../api/http';
 
@@ -68,7 +68,10 @@ export default function LoginPage() {
             登录
           </Button>
         </Form>
-        <Typography.Paragraph type="secondary" style={{ marginTop: 20, marginBottom: 0, fontSize: 12 }}>
+        <Typography.Paragraph style={{ marginTop: 16, marginBottom: 0, textAlign: 'center' }}>
+          读者还没有账号？<Link to="/register">立即注册</Link>
+        </Typography.Paragraph>
+        <Typography.Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0, fontSize: 12 }}>
           初始账号：管理员 admin / Admin@123456（首次登录后请及时修改密码）
         </Typography.Paragraph>
       </Card>

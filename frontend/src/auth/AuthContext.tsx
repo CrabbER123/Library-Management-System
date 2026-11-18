@@ -1,12 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { authApi } from '../api';
 import { tokenStore } from '../api/http';
-import type { CurrentUser } from '../api/types';
+import type { CurrentUser, RegisterPayload } from '../api/types';
 
 interface AuthContextValue {
   user: CurrentUser | null;
   initializing: boolean;
   login: (username: string, password: string) => Promise<CurrentUser>;
+  register: (payload: RegisterPayload) => Promise<CurrentUser>;
   logout: () => Promise<void>;
   reload: () => Promise<void>;
   hasRole: (...roles: string[]) => boolean;
@@ -56,6 +57,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return current;
   }, []);
 
+  const register = useCallback(async (payload: RegisterPayload) => {
+    const result = await authApi.register(payload);
+    tokenStore.save(result);
+    const current = await authApi.me();
+    setUser(current);
+    return current;
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await authApi.logout();
@@ -73,13 +82,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       initializing,
       login,
+      register,
       logout,
       reload,
       hasRole,
       isStaff: hasRole('ADMIN', 'LIBRARIAN'),
       isAdmin: hasRole('ADMIN'),
     }),
-    [user, initializing, login, logout, reload, hasRole],
+    [user, initializing, login, register, logout, reload, hasRole],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

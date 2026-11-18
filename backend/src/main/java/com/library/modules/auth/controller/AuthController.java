@@ -4,6 +4,7 @@ import com.library.common.result.ApiResponse;
 import com.library.modules.auth.dto.CurrentUserVO;
 import com.library.modules.auth.dto.LoginRequest;
 import com.library.modules.auth.dto.RefreshTokenRequest;
+import com.library.modules.auth.dto.RegisterRequest;
 import com.library.modules.auth.dto.TokenResponse;
 import com.library.modules.auth.service.AuthService;
 import com.library.security.SecurityUtils;
@@ -12,10 +13,12 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -34,6 +37,14 @@ public class AuthController {
     @Operation(summary = "登录", description = "返回 accessToken（30 分钟）与 refreshToken（7 天）")
     public ApiResponse<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
         return ApiResponse.ok(authService.login(request));
+    }
+
+    @PostMapping("/register")
+    @ResponseStatus(HttpStatus.CREATED)
+    @SecurityRequirements
+    @Operation(summary = "读者自助注册", description = "创建 READER 账号与借阅证，并直接返回令牌（免登录）")
+    public ApiResponse<TokenResponse> register(@Valid @RequestBody RegisterRequest request) {
+        return ApiResponse.ok(authService.register(request));
     }
 
     @PostMapping("/refresh")

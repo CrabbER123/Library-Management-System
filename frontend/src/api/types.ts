@@ -49,6 +49,14 @@ export interface LoginResult {
   user: UserVO;
 }
 
+export interface RegisterPayload {
+  username: string;
+  password: string;
+  displayName: string;
+  phone?: string;
+  email?: string;
+}
+
 export interface AuthorBrief {
   id: number;
   name: string;

@@ -1,10 +1,13 @@
 package com.library.modules.auth.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.library.common.constant.RoleCodes;
 import com.library.common.exception.BizException;
 import com.library.common.exception.ErrorCode;
+import com.library.config.BorrowProperties;
 import com.library.modules.auth.dto.CurrentUserVO;
 import com.library.modules.auth.dto.LoginRequest;
+import com.library.modules.auth.dto.RegisterRequest;
 import com.library.modules.auth.dto.TokenResponse;
 import com.library.modules.auth.entity.RefreshToken;
 import com.library.modules.auth.mapper.RefreshTokenMapper;
@@ -44,6 +47,43 @@ public class AuthServiceImpl implements AuthService {
     private final RoleAssignmentService roleAssignmentService;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final BorrowProperties borrowProperties;
+
+    @Override
+    @Transactional
+    public TokenResponse register(RegisterRequest request) {
+        String username = request.username().trim();
+        Long exists = userMapper.selectCount(Wrappers.<User>lambdaQuery().eq(User::getUsername, username));
+        if (exists != null && exists > 0) {
+            throw new BizException(ErrorCode.DUPLICATE, "用户名已被注册: " + username);
+        }
+
+        User user = new User();
+        user.setUsername(username);
+        user.setPasswordHash(passwordEncoder.encode(request.password()));
+        user.setDisplayName(request.displayName().trim());
+        user.setPhone(trimToNull(request.phone()));
+        user.setEmail(trimToNull(request.email()));
+        user.setStatus(UserStatus.ACTIVE);
+        userMapper.insert(user);
+
+        roleAssignmentService.replace(user.getId(), List.of(RoleCodes.READER));
+
+        // 注册即开通借阅证：先插入占位证号，拿到主键后再生成正式证号（R000001）
+        Reader reader = new Reader();
+        reader.setUserId(user.getId());
+        reader.setCardNo("PENDING-" + user.getId());
+        reader.setName(user.getDisplayName());
+        reader.setPhone(user.getPhone());
+        reader.setEmail(user.getEmail());
+        reader.setStatus("ACTIVE");
+        reader.setMaxBorrow(borrowProperties.maxBorrowPerReader());
+        readerMapper.insert(reader);
+        reader.setCardNo(String.format("R%06d", reader.getId()));
+        readerMapper.updateById(reader);
+
+        return issueTokens(user, List.of(RoleCodes.READER));
+    }
 
     @Override
     @Transactional
@@ -147,5 +187,9 @@ public class AuthServiceImpl implements AuthService {
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("JVM 不支持 SHA-256", ex);
         }
+    }
+
+    private String trimToNull(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
     }
 }

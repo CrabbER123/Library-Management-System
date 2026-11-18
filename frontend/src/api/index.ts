@@ -13,6 +13,7 @@ import type {
   PopularBook,
   ReaderPayload,
   ReaderVO,
+  RegisterPayload,
   UserVO,
 } from './types';
 
@@ -21,6 +22,8 @@ import type {
 export const authApi = {
   login: (username: string, password: string) =>
     http.post('/auth/login', { username, password }) as unknown as Promise<LoginResult>,
+  register: (payload: RegisterPayload) =>
+    http.post('/auth/register', payload) as unknown as Promise<LoginResult>,
   me: () => http.get('/auth/me') as unknown as Promise<CurrentUser>,
   logout: () => http.post('/auth/logout') as unknown as Promise<void>,
 };
