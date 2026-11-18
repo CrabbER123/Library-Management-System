@@ -1,0 +1,132 @@
+# 验收清单
+
+按顺序执行即可完成验收；每条都标注了验证方式与预期结果。命令均在项目根目录执行。
+
+## 0. 前置条件
+
+- [ ] JDK 21（`java -version` 输出 21.x）
+- [ ] Maven 3.9+（`mvn -v`）
+- [ ] Node.js 20+ 与 pnpm（`node -v`、`pnpm -v`）
+- [ ] MySQL 8.0 可用（本机或 Docker）；或 Docker Desktop 已启动用于 `docker compose`
+
+## 1. 后端单元测试
+
+```bash
+cd backend
+mvn test
+```
+
+- [ ] 输出 `Tests run: 62, Failures: 0, Errors: 0`
+- [ ] 覆盖：JWT 生成/解析/过期/篡改、登录与刷新轮换、用户与角色、图书（ISBN 规范化/库存重算/删除校验）、读者、作者、借还续与逾期罚款、统计聚合
+
+## 2. 前端组件测试与构建
+
+```bash
+cd frontend
+pnpm test
+pnpm build
+```
+
+- [ ] `Test Files 3 passed`，`Tests 11 passed`
+- [ ] `tsc --noEmit` 无类型错误，`vite build` 产出 `dist/`（含 react/antd 独立 chunk）
+
+## 3. 本地联调启动
+
+```bash
+# 终端 1：先建库（仅首次）
+mysql -h 127.0.0.1 -P 3306 -u root -p -e "CREATE DATABASE library CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci; CREATE USER 'library'@'%' IDENTIFIED BY 'library123'; GRANT ALL ON library.* TO 'library'@'%';"
+
+# 终端 2：后端
+cd backend && mvn spring-boot:run
+
+# 终端 3：前端
+cd frontend && pnpm dev
+```
+
+- [ ] `GET http://localhost:8080/actuator/health` 返回 `{"status":"UP"}`
+- [ ] `http://localhost:8080/swagger-ui.html` 可打开并列出全部分组
+- [ ] Flyway 日志显示 V1~V4 全部 `Success`，`flyway_schema_history` 4 条记录
+- [ ] `http://localhost:5173` 打开登录页，`/api` 代理到后端（登录成功）
+
+## 4. 账号与权限
+
+| 账号 | 密码 | 预期 |
+| --- | --- | --- |
+| `admin` | `Admin@123456` | 可见"用户与角色"菜单，可增删改用户 |
+| `librarian` | `Lib@123456` | 可见借阅/读者/基础数据/统计，看不到用户管理 |
+| `reader01` | `Reader@123456` | 只有"图书查询"和"我的借阅"，访问 `/users` 返回 403 |
+
+- [ ] 登录成功返回 `accessToken` / `refreshToken`，`expiresIn=1800`
+- [ ] 直接访问 `http://localhost:5173/users`（reader01）显示 403 页面
+- [ ] 刷新令牌后旧 refresh token 再用返回 `40102`
+- [ ] 停用某账号后该账号无法登录
+
+## 5. 图书与主数据
+
+- [ ] 图书列表分页：`GET /api/v1/books?page=1&size=10` 返回 8 条种子数据
+- [ ] 关键字搜索"刘慈欣"能搜到《三体》（作者名子查询生效）
+- [ ] 新增图书时 ISBN 带连字符可保存，入库为 13 位纯数字
+- [ ] 重复 ISBN 返回 `409/40901`，非法 ISBN 返回 `422/42200`
+- [ ] 总库存不能小于已借出数（返回 `422`）
+- [ ] 被图书引用的作者/出版社/分类无法删除（返回 `409`）
+- [ ] 已产生借阅记录的图书无法删除（提示改为下架）
+
+## 6. 读者
+
+- [ ] 读者列表含张三（R2024001）、李四（R2024002）、王五（R2024003）
+- [ ] 借阅证号重复返回 `409/40901`
+- [ ] 一个登录账号不能被绑定到两个读者档案
+- [ ] `GET /readers/me`（reader01）返回 `cardNo=R2024001`、`maxBorrow=5`、`borrowingCount`
+
+## 7. 借书 / 还书 / 续借
+
+- [ ] 借书成功后：图书 `availableStock -1`，借阅记录 `status=BORROWED`，`dueDate = 今天 + 30 天`
+- [ ] 同一读者重复借同一本书 → `422/42206`
+- [ ] 读者在借数达到上限 → `422/42202`
+- [ ] 停用读者借书 → `422/42203`；下架图书借书 → `422/42206`
+- [ ] 库存为 0 时借书 → `422/42201`
+- [ ] 续借成功：`dueDate +15 天`、`renewTimes=1`；第 3 次续借 → `422/42204`
+- [ ] 逾期记录续借 → `422/42205`（默认不允许）
+- [ ] 还书成功后：`status=RETURNED`、`returnDate=今天`、`availableStock +1`
+- [ ] 逾期 10 天还书：`fineAmount=5.00`、`overdueDays=10`
+- [ ] 重复还书 → `409/40900`
+
+## 8. 统计
+
+- [ ] `GET /stats/overview` 返回图书种类/册数/可借/借出/逾期/读者等 8 项指标，且与数据库一致
+- [ ] `GET /stats/popular-books?limit=5` 按借阅次数倒序，首条为《三体》
+- [ ] `GET /stats/category-distribution` 覆盖全部分类（含 0 本的分类）
+- [ ] `limit` 超出 1~50 返回 `422/42200`
+- [ ] 前端"统计概览"页 4 张卡片、排行榜、分类分布渲染正常
+
+## 9. 前端页面
+
+- [ ] 登录页表单校验：空提交提示"请输入用户名/密码"
+- [ ] 图书页：搜索、分类筛选、状态筛选、排序、分页、封面缩略图、库存列
+- [ ] 图书新增/编辑弹窗：作者多选、出版社、分类、库存、上下架
+- [ ] 借阅管理页：借书弹窗（读者/图书远程搜索）、还书、续借、逾期红色标记与罚款列
+- [ ] 我的借阅页：借阅证信息 + 记录表格；未绑定档案时显示提示
+- [ ] 基础数据三个页面（作者/出版社/分类）复用同一套通用表格 + 动态表单
+- [ ] 用户管理页：新增/编辑（密码留空不改）/启停用/删除，管理员账号不可删除自己
+- [ ] 任一接口报错时页面右上角出现后端返回的中文错误文案
+
+## 10. Docker Compose 一键启动
+
+```bash
+cp .env.example .env       # 可选：修改端口与密码
+docker compose up -d --build
+docker compose ps
+```
+
+- [ ] 三个容器 `library-mysql` / `library-backend` / `library-frontend` 均为 healthy/running
+- [ ] `docker compose logs backend | grep Flyway` 显示 V1~V4 执行成功
+- [ ] `http://localhost` 可登录，`http://localhost:8080/swagger-ui.html` 可访问
+- [ ] 重启容器后数据仍在（`mysql-data` 卷持久化）
+- [ ] `docker compose down` 停止；`docker compose down -v` 清空数据
+
+## 11. 文档完整性
+
+- [ ] `README.md`：环境要求、启动步骤、默认账号、接口示例、常见问题
+- [ ] `docs/er-diagram.md`：Mermaid ER 图、约束与索引、借阅规则配置
+- [ ] `docs/api.md`：错误码、权限矩阵、curl 示例
+- [ ] 本清单可被新开发者独立执行通过

@@ -1,0 +1,18 @@
+spring:
+  datasource:
+    url: jdbc:mysql://${DB_HOST:mysql}:${DB_PORT:3306}/${DB_NAME:library}?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&rewriteBatchedStatements=true
+    username: ${DB_USERNAME:library}
+    password: ${DB_PASSWORD:library123}
+
+# 说明：docker 配置面向"本地一键启动演示"，因此保留 Swagger；
+# 真正上线请改用 prod 配置（会关闭 API 文档并降低日志级别）。
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+logging:
+  level:
+    root: INFO
+    com.library: INFO

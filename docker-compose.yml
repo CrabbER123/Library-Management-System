@@ -1,0 +1,66 @@
+# 图书管理系统 —— 一键启动三件套（MySQL + Spring Boot 后端 + Nginx 前端）
+# 使用：docker compose up -d --build
+# 访问：http://localhost:8080/swagger-ui.html（接口文档）、http://localhost（前端）
+
+# 显式指定 compose 项目名：目录名为中文时自动推导会得到空名称
+name: library
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: library-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123456}
+      MYSQL_DATABASE: ${DB_NAME:-library}
+      MYSQL_USER: ${DB_USERNAME:-library}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-library123}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+08:00
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+
+  backend:
+    build:
+      context: ./backend
+    container_name: library-backend
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker}
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-library}
+      DB_USERNAME: ${DB_USERNAME:-library}
+      DB_PASSWORD: ${DB_PASSWORD:-library123}
+      JWT_SECRET: ${JWT_SECRET:-docker-only-library-jwt-secret-key-change-in-prod}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost,http://127.0.0.1}
+      TZ: Asia/Shanghai
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: library-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      - backend
+
+volumes:
+  mysql-data:
